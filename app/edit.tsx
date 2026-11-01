@@ -3,7 +3,7 @@ import {Text,TextInput,Pressable,ScrollView,StyleSheet,Alert,Platform,View} from
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {useLocalSearchParams,useRouter} from 'expo-router';
 import {getTask,saveTask} from '../src/store';
-import {cancelTaskNotification,scheduleTask} from '../src/notifications';
+import {cancelTaskNotification,scheduleTask,testNotification} from '../src/notifications';
 import {theme as c} from '../src/theme';
 export default function Edit(){
   const {id}=useLocalSearchParams<{id?:string}>();
@@ -23,6 +23,9 @@ export default function Edit(){
     setSaving(true);
     try{
       const notificationId=completed?null:await scheduleTask(title.trim(),due.getTime());
+      if(!completed && due.getTime()>Date.now() && !notificationId){
+        Alert.alert('Notificação não agendada','Verifique a permissão de notificações do Expo Go nas configurações do Android. A tarefa será salva sem aviso.');
+      }
       try{await saveTask({title:title.trim(),description,due_at:due.getTime(),priority},id?Number(id):undefined,notificationId);}
       catch(e){await cancelTaskNotification(notificationId);throw e;}
       await cancelTaskNotification(oldNotification);
@@ -49,6 +52,7 @@ export default function Edit(){
     <Text style={s.label}>Prioridade</Text>
     <View style={s.row}>{(['low','medium','high'] as const).map((p,i)=><Pressable key={p} style={[s.choice,priority===p&&s.selected]} onPress={()=>setPriority(p)}><Text style={[s.choiceText,priority===p&&s.selectedText]}>{['Baixa','Média','Alta'][i]}</Text></Pressable>)}</View>
     {completed?<Text style={s.helper}>Esta tarefa já está concluída. Não será agendada uma nova notificação.</Text>:null}
+    <Pressable style={[s.choice,{marginTop:20}]} onPress={async()=>{try{await testNotification();Alert.alert('Teste agendado','A notificação de teste deve aparecer em cerca de 10 segundos. Confira também o terminal do Expo.');}catch(e){Alert.alert('Falha no teste',String(e));}}}><Text style={s.choiceText}>Testar notificação (10 segundos)</Text></Pressable>
     <Pressable style={[s.button,saving&&{opacity:0.6}]} disabled={saving} onPress={save}><Text style={s.buttonText}>{saving?'Salvando...':'Salvar tarefa'}</Text></Pressable>
   </ScrollView>;
 }
