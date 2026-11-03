@@ -7,7 +7,7 @@ export const theme={
   accent:'#D7FC65',accentSoft:'#354326',danger:'#FF887B',
   success:'#D7FC65',warning:'#F7C66F',
 };
-export type ThemeColors=typeof theme;
+export type ThemeColors={ [K in keyof typeof theme]: string };
 export type Appearance='dark'|'softLight';
 export const palettes:Record<Appearance,ThemeColors>={
   dark:theme,
