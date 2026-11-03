@@ -87,7 +87,7 @@ export default function Edit(){
             {Array.from({length:new Date(month.getFullYear(),month.getMonth(),1).getDay()},(_,i)=><View key={'blank'+i} style={s.dayCell}/>)}
             {Array.from({length:new Date(month.getFullYear(),month.getMonth()+1,0).getDate()},(_,i)=>{
               const day=i+1,selected=due.getFullYear()===month.getFullYear()&&due.getMonth()===month.getMonth()&&due.getDate()===day;
-              return <Pressable key={day} style={[s.dayCell,selected&&s.daySelected]} onPress={()=>{setDue(prev=>{const next=new Date(prev);next.setFullYear(month.getFullYear(),month.getMonth(),day);return next;});setPicker(null);}}><Text style={[s.dayText,selected&&s.daySelectedText]}>{day}</Text></Pressable>;
+              return <Pressable key={day} style={[s.dayCell,selected&&s.daySelected]} onPress={()=>{setDue(prev=>{const next=new Date(prev);next.setDate(1);next.setFullYear(month.getFullYear(),month.getMonth(),day);return next;});setPicker(null);}}><Text style={[s.dayText,selected&&s.daySelectedText]}>{day}</Text></Pressable>;
             })}
           </View>
         </>:<>
