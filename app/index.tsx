@@ -1,10 +1,11 @@
 import React,{useCallback,useState} from 'react';
-import {View,Text,ScrollView,Pressable,StyleSheet,Alert,AppState,StatusBar} from 'react-native';
+import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Task,listTasks,completeTask,deleteTask} from '../src/store';
 import {categories} from '../src/templates';
 import {theme as c} from '../src/theme';
+import {PingDialog} from '../src/components/PingDialog';
 
 type Tab='home'|'tasks'|'alerts';
 const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
@@ -14,6 +15,9 @@ export default function Home(){
   const [tasks,setTasks]=useState<Task[]>([]);
   const [tab,setTab]=useState<Tab>('home');
   const [now,setNow]=useState(Date.now());
+  const [deleteTarget,setDeleteTarget]=useState<Task|null>(null);
+  const [busyDelete,setBusyDelete]=useState(false);
+  const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
   const router=useRouter();
   const insets=useSafeAreaInsets();
   const refresh=useCallback(async()=>{setTasks(await listTasks());setNow(Date.now());},[]);
@@ -29,13 +33,15 @@ export default function Home(){
   const today=pending.filter(t=>new Date(t.due_at).toDateString()===new Date(now).toDateString());
   async function toggle(t:Task){
     try{await completeTask(t.id,!t.completed);await refresh();}
-    catch(e){Alert.alert('Erro ao atualizar',String(e));}
+    catch(e){setFeedback({title:'Não deu certo.',message:String(e)});}
   }
-  function remove(t:Task){
-    Alert.alert('Excluir tarefa?',t.title,[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:async()=>{
-      try{await deleteTask(t.id);await refresh();}
-      catch(e){Alert.alert('Erro ao excluir',String(e));}
-    }}]);
+  function remove(t:Task){setDeleteTarget(t);}
+  async function confirmDelete(){
+    if(!deleteTarget||busyDelete)return;
+    setBusyDelete(true);
+    try{await deleteTask(deleteTarget.id);setDeleteTarget(null);await refresh();}
+    catch(e){setDeleteTarget(null);setFeedback({title:'Não foi possível excluir.',message:String(e)});}
+    finally{setBusyDelete(false);}
   }
   function card(t:Task){
     const late=!t.completed&&t.due_at<now;
@@ -52,6 +58,8 @@ export default function Home(){
   }
   const empty=(message:string)=><Text style={s.empty}>{message}</Text>;
   return <View style={s.root}>
+    <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
+    <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
     <StatusBar barStyle="light-content"/>
     <ScrollView contentContainerStyle={s.container}>
       <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
