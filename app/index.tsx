@@ -61,8 +61,8 @@ export default function Home(){
   function card(t:Task){
     const late=!t.completed&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
-    return <Pressable key={t.id} style={[s.task,late?{backgroundColor:appearance==='dark'?'#3D211F':'#FCE4DE',borderWidth:1,borderBottomWidth:1,borderColor:appearance==='dark'?'#FF887B':'#C64F43',borderBottomColor:appearance==='dark'?'#FF887B':'#C64F43',borderRadius:8}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
-      <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,!!t.completed?s.checked:undefined]}>
+    return <Pressable key={t.id} style={[s.task,late?{backgroundColor:appearance==='dark'?'#271B19':'#F7E9E3',borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+      <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,late?{borderColor:appearance==='dark'?'#FF887B':'#B83931'}:undefined,!!t.completed?s.checked:undefined]}>
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
       <View style={{flex:1,gap:7}}>
@@ -70,7 +70,7 @@ export default function Home(){
         <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{formatDate(t.due_at)}</Text></View>
       </View>
       <View style={s.priorityWrap}>
-        {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:8,paddingVertical:6,borderRadius:6}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
+        {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:7,paddingVertical:5,borderRadius:5}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
         <View style={[s.priorityLine,{backgroundColor:late?(appearance==='dark'?'#FF887B':'#B83931'):({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[t.priority]}]}/>
       </View>
     </Pressable>;
