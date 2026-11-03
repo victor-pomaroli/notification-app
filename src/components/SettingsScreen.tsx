@@ -3,9 +3,11 @@ import {View,Text,Switch,Pressable,StyleSheet,Alert,Linking} from 'react-native'
 import * as Notifications from 'expo-notifications';
 import {getPreferences,setPreference,Preferences} from '../preferences';
 import {rescheduleAllReminders,deleteAllTasks} from '../store';
-import {theme as c} from '../theme';
+import {useAppTheme,ThemeColors} from '../theme';
 
 export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
+ const {colors:c}=useAppTheme();
+ const s=React.useMemo(()=>createStyles(c),[c]);
  const [prefs,setPrefs]=useState<Preferences>({notifications:true,privatePreviews:false});
  const [busy,setBusy]=useState(false);
  const [permission,setPermission]=useState('Verificando...');
@@ -58,7 +60,7 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
    <View style={s.panel}><View style={s.row}><View style={s.copy}><Text style={s.title}>ping.</Text><Text style={s.detail}>Seus lembretes, suas regras. Versão 1.0.2.</Text></View></View></View>
  </View>;
 }
-const s=StyleSheet.create({
+const createStyles=(c:ThemeColors)=>StyleSheet.create({
  kicker:{color:c.accent,fontSize:10,fontWeight:'900',letterSpacing:2,marginBottom:13},
  heading:{color:c.text,fontSize:38,fontWeight:'900',letterSpacing:-1.5,marginBottom:10},
  subtitle:{color:c.muted,fontSize:13,lineHeight:20,marginBottom:15},
