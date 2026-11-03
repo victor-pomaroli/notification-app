@@ -4,7 +4,7 @@ import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Task,listTasks,completeTask,deleteTask} from '../src/store';
 import {categories} from '../src/templates';
-import {theme as c} from '../src/theme';
+import {useAppTheme,ThemeColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 import {SettingsScreen} from '../src/components/SettingsScreen';
 
@@ -13,6 +13,8 @@ const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
 const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'];
 export default function Home(){
+  const {colors:c}=useAppTheme();
+  const s=React.useMemo(()=>createStyles(c),[c]);
   const [tasks,setTasks]=useState<Task[]>([]);
   const [tab,setTab]=useState<Tab>('home');
   const pager=useRef<ScrollView>(null);
@@ -70,7 +72,7 @@ export default function Home(){
   return <View style={s.root}>
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
-    <StatusBar barStyle="light-content"/>
+    <StatusBar barStyle={c.background==='#111310'?"light-content":"dark-content"}/>
     <Animated.ScrollView ref={pager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
       style={{flex:1}} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
       onScroll={Animated.event([{nativeEvent:{contentOffset:{x:horizontalX}}}],{useNativeDriver:true})}
@@ -126,7 +128,7 @@ export default function Home(){
     </Pressable>)}</View>
   </View>;
 }
-const s=StyleSheet.create({
+const createStyles=(c:ThemeColors)=>StyleSheet.create({
   root:{flex:1,backgroundColor:c.background},container:{paddingHorizontal:23,paddingTop:18,paddingBottom:140},
   sharedBrand:{position:'absolute',left:23,right:23,zIndex:2},
   brand:{flexDirection:'row',alignItems:'center',marginBottom:43,gap:9},brandMark:{width:28,height:28,borderRadius:7,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',transform:[{rotate:'-9deg'}]},
