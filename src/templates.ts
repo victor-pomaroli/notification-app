@@ -24,8 +24,7 @@ export function reminderMessage(category:TaskCategory,stage:ReminderStage,varian
  const position=Math.abs(variant+stage)%3;
  if(position===0)return name+', '+message.charAt(0).toLowerCase()+message.slice(1);
  if(position===1){
-   const punctuation=/[.!?]$/.test(message)?'':'';
-   return message+punctuation+' '+name+'.';
+   return message.replace(/[.!?]+$/,'')+', '+name+'.';
  }
  return message;
 }
