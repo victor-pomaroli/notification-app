@@ -91,7 +91,7 @@ export default function Home(){
       <Animated.ScrollView style={{flex:1}} contentContainerStyle={[s.container,{paddingTop:insets.top+89}]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
         onScroll={Animated.event([{nativeEvent:{contentOffset:{y:verticalY[page]}}}],{useNativeDriver:true})}>
 
-      {page==='settings'?<SettingsScreen onDataDeleted={()=>refresh().catch(console.warn)}/>:<>
+      {page==='settings'?<><SettingsScreen onDataDeleted={()=>refresh().catch(console.warn)}/><Pressable accessibilityRole="button" onPress={()=>router.push('/archive')} style={{marginTop:22,padding:17,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.border}}><Text style={{color:c.accent,fontWeight:'900'}}>HISTÓRICO DE TAREFAS ARQUIVADAS →</Text><Text style={{color:c.muted,fontSize:12,marginTop:6}}>Consulte e restaure tarefas concluídas há mais de 30 dias.</Text></Pressable></>:<>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
       <Text style={s.heading}>{page==='home'?'Seu dia.\nSem desculpas.':page==='tasks'?'Tudo na\nmesma lista.':'Olha o que\nficou pra trás.'}</Text>
       {page==='home'?<>
