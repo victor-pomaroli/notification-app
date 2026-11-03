@@ -1,5 +1,5 @@
 import React,{useCallback,useRef,useState} from 'react';
-import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar} from 'react-native';
+import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar,Dimensions} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Task,listTasks,completeTask,deleteTask} from '../src/store';
@@ -14,7 +14,10 @@ const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO
 export default function Home(){
   const [tasks,setTasks]=useState<Task[]>([]);
   const [tab,setTab]=useState<Tab>('home');
-  const touchStart=useRef<{x:number;y:number}|null>(null);
+  const pager=useRef<ScrollView>(null);
+  const [pageWidth,setPageWidth]=useState(Dimensions.get('window').width);
+  const tabs:Tab[]=['home','tasks','alerts'];
+  const goToTab=(next:Tab)=>{setTab(next);pager.current?.scrollTo({x:tabs.indexOf(next)*pageWidth,animated:true});};
   const [now,setNow]=useState(Date.now());
   const [deleteTarget,setDeleteTarget]=useState<Task|null>(null);
   const [busyDelete,setBusyDelete]=useState(false);
@@ -28,16 +31,6 @@ export default function Home(){
     const interval=setInterval(()=>setNow(Date.now()),30000);
     return ()=>{sub.remove();clearInterval(interval);};
   },[refresh]));
-  const onSwipeEnd=(x:number,y:number)=>{
-    const start=touchStart.current;
-    touchStart.current=null;
-    if(!start)return;
-    const dx=x-start.x;
-    const dy=y-start.y;
-    if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.3)return;
-    const tabs:Tab[]=['home','tasks','alerts'];
-    setTab(current=>tabs[Math.max(0,Math.min(tabs.length-1,tabs.indexOf(current)+(dx<0?1:-1)))]);
-  };
   const pending=tasks.filter(t=>!t.completed);
   const overdue=pending.filter(t=>t.due_at<now);
   const upcoming=pending.filter(t=>t.due_at>=now);
@@ -75,15 +68,16 @@ export default function Home(){
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
     <StatusBar barStyle="light-content"/>
-    <ScrollView contentContainerStyle={[s.container,{paddingTop:insets.top+18}]}
-      onTouchStart={event=>{touchStart.current={x:event.nativeEvent.pageX,y:event.nativeEvent.pageY};}}
-      onTouchEnd={event=>onSwipeEnd(event.nativeEvent.pageX,event.nativeEvent.pageY)}
-      onTouchCancel={()=>{touchStart.current=null;}}
+    <ScrollView ref={pager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
+      style={{flex:1}} keyboardShouldPersistTaps="handled"
+      onLayout={event=>{const width=event.nativeEvent.layout.width;if(width>0&&width!==pageWidth){setPageWidth(width);pager.current?.scrollTo({x:tabs.indexOf(tab)*width,animated:false});}}}
+      onMomentumScrollEnd={event=>{const index=Math.max(0,Math.min(2,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));setTab(tabs[index]);}}
     >
+      {tabs.map(page=><ScrollView key={page} style={{width:pageWidth}} contentContainerStyle={[s.container,{paddingTop:insets.top+18}]} keyboardShouldPersistTaps="handled">
       <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
-      <Text style={s.heading}>{tab==='home'?'Seu dia.\nSem desculpas.':tab==='tasks'?'Tudo na\nmesma lista.':'Olha o que\nficou pra trás.'}</Text>
-      {tab==='home'?<>
+      <Text style={s.heading}>{page==='home'?'Seu dia.\nSem desculpas.':page==='tasks'?'Tudo na\nmesma lista.':'Olha o que\nficou pra trás.'}</Text>
+      {page==='home'?<>
         <View style={s.hero}>
           <Text style={s.heroLabel}>O RESUMO DA ÓPERA</Text>
           <View style={s.heroNumbers}><Text style={s.heroNumber}>{pending.length.toString().padStart(2,'0')}</Text><View style={s.heroSide}><Text style={s.heroSideBig}>{overdue.length} atrasadas</Text><Text style={s.heroSideSmall}>{today.length} pra hoje</Text></View></View>
@@ -94,13 +88,14 @@ export default function Home(){
         <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
         {upcoming.length?upcoming.slice(0,8).map(card):empty('Nenhuma tarefa futura. Que paz suspeita.')}
       </>:<>
-        <View style={s.sectionHead}><Text style={s.section}>{tab==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(tab==='tasks'?tasks.length:overdue.length).padStart(2,'0')}</Text></View>
-        {tab==='tasks'?(tasks.length?tasks.map(card):empty('Ainda não tem nada aqui. Crie sua primeira tarefa.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
+        <View style={s.sectionHead}><Text style={s.section}>{page==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(page==='tasks'?tasks.length:overdue.length).padStart(2,'0')}</Text></View>
+        {page==='tasks'?(tasks.length?tasks.map(card):empty('Ainda não tem nada aqui. Crie sua primeira tarefa.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
       </>}
       <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>
+      </ScrollView>)}
     </ScrollView>
     <Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>
-    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>setTab(key)}>
+    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
       <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS'][i]}</Text>
       {tab===key?<View style={s.dot}/>:null}
     </Pressable>)}</View>
