@@ -61,7 +61,7 @@ export default function Home(){
   function card(t:Task){
     const late=!t.completed&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
-    return <Pressable key={t.id} style={[s.task,late?{backgroundColor:appearance==='dark'?'#3D211F':'#FCE4DE',borderWidth:1,borderColor:appearance==='dark'?'#FF887B':'#C64F43',borderRadius:12,paddingHorizontal:12,marginVertical:5}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+    return <Pressable key={t.id} style={[s.task,late?{backgroundColor:appearance==='dark'?'#3D211F':'#FCE4DE',borderWidth:1,borderBottomWidth:1,borderColor:appearance==='dark'?'#FF887B':'#C64F43',borderBottomColor:appearance==='dark'?'#FF887B':'#C64F43',borderRadius:8}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
       <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,!!t.completed?s.checked:undefined]}>
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
