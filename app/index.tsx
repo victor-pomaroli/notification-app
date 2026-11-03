@@ -1,6 +1,7 @@
 import React,{useCallback,useState} from 'react';
 import {View,Text,ScrollView,Pressable,StyleSheet,Alert,AppState,StatusBar} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Task,listTasks,completeTask,deleteTask} from '../src/store';
 import {categories} from '../src/templates';
 import {theme as c} from '../src/theme';
@@ -14,6 +15,7 @@ export default function Home(){
   const [tab,setTab]=useState<Tab>('home');
   const [now,setNow]=useState(Date.now());
   const router=useRouter();
+  const insets=useSafeAreaInsets();
   const refresh=useCallback(async()=>{setTasks(await listTasks());setNow(Date.now());},[]);
   useFocusEffect(useCallback(()=>{
     refresh().catch(console.warn);
@@ -71,8 +73,8 @@ export default function Home(){
       </>}
       <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>
     </ScrollView>
-    <Pressable accessibilityLabel="Criar tarefa" style={s.add} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>
-    <View style={s.nav}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>setTab(key)}>
+    <Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>
+    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]]}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>setTab(key)}>
       <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS'][i]}</Text>
       {tab===key?<View style={s.dot}/>:null}
     </Pressable>)}</View>
