@@ -21,11 +21,8 @@ export async function setPreference<K extends keyof Preferences>(key:K,value:Pre
 export async function needsOnboarding():Promise<boolean>{
   const conn=await db;
   await conn.execAsync('CREATE TABLE IF NOT EXISTS app_preferences (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
-  const rows=await conn.getAllAsync<{key:string;value:string}>("SELECT key,value FROM app_preferences WHERE key IN ('onboardingComplete','displayName','addressStyle','personality')");
-  const values=Object.fromEntries(rows.map(row=>[row.key,row.value]));
-  if(values.onboardingComplete==='true')return false;
-  // Existing installations with a configured profile should not be interrupted.
-  return !('displayName' in values||'addressStyle' in values||'personality' in values);
+  const row=await conn.getFirstAsync<{value:string}>("SELECT value FROM app_preferences WHERE key='onboardingComplete'");
+  return row?.value!=='true';
 }
 export async function completeOnboarding(name:string,addressStyle:AddressStyle,personality:NotificationPersonality):Promise<void>{
   const conn=await db;
