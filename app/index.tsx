@@ -6,8 +6,9 @@ import {Task,listTasks,completeTask,deleteTask} from '../src/store';
 import {categories} from '../src/templates';
 import {theme as c} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
+import {SettingsScreen} from '../src/components/SettingsScreen';
 
-type Tab='home'|'tasks'|'alerts';
+type Tab='home'|'tasks'|'alerts'|'settings';
 const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
 const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'];
@@ -16,7 +17,7 @@ export default function Home(){
   const [tab,setTab]=useState<Tab>('home');
   const pager=useRef<ScrollView>(null);
   const [pageWidth,setPageWidth]=useState(Dimensions.get('window').width);
-  const tabs:Tab[]=['home','tasks','alerts'];
+  const tabs:Tab[]=['home','tasks','alerts','settings'];
   const goToTab=(next:Tab)=>{setTab(next);pager.current?.scrollTo({x:tabs.indexOf(next)*pageWidth,animated:true});};
   const [now,setNow]=useState(Date.now());
   const [deleteTarget,setDeleteTarget]=useState<Task|null>(null);
@@ -71,10 +72,11 @@ export default function Home(){
     <ScrollView ref={pager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
       style={{flex:1}} keyboardShouldPersistTaps="handled"
       onLayout={event=>{const width=event.nativeEvent.layout.width;if(width>0&&width!==pageWidth){setPageWidth(width);pager.current?.scrollTo({x:tabs.indexOf(tab)*width,animated:false});}}}
-      onMomentumScrollEnd={event=>{const index=Math.max(0,Math.min(2,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));setTab(tabs[index]);}}
+      onMomentumScrollEnd={event=>{const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));setTab(tabs[index]);}}
     >
       {tabs.map(page=><ScrollView key={page} style={{width:pageWidth}} contentContainerStyle={[s.container,{paddingTop:insets.top+18}]} keyboardShouldPersistTaps="handled">
       <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
+      {page==='settings'?<SettingsScreen onDataDeleted={()=>refresh().catch(console.warn)}/>:<>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
       <Text style={s.heading}>{page==='home'?'Seu dia.\nSem desculpas.':page==='tasks'?'Tudo na\nmesma lista.':'Olha o que\nficou pra trás.'}</Text>
       {page==='home'?<>
@@ -92,11 +94,12 @@ export default function Home(){
         {page==='tasks'?(tasks.length?tasks.map(card):empty('Ainda não tem nada aqui. Crie sua primeira tarefa.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
       </>}
       <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>
+      </>}
       </ScrollView>)}
     </ScrollView>
-    <Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>
-    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
-      <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS'][i]}</Text>
+    {tab!=='settings'&&<Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>}
+    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts','settings'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
+      <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS','AJUSTES'][i]}</Text>
       {tab===key?<View style={s.dot}/>:null}
     </Pressable>)}</View>
   </View>;
