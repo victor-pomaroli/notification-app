@@ -3,6 +3,7 @@ import {View,Text,Switch,Pressable,StyleSheet,Alert,Linking} from 'react-native'
 import * as Notifications from 'expo-notifications';
 import {getPreferences,setPreference,Preferences} from '../preferences';
 import {rescheduleAllReminders,deleteAllTasks} from '../store';
+import {testNotification} from '../notifications';
 import {useAppTheme,ThemeColors,Appearance,palettes} from '../theme';
 
 export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
@@ -12,13 +13,26 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
  const [busy,setBusy]=useState(false);
  const [permission,setPermission]=useState('Verificando...');
  const [themeBusy,setThemeBusy]=useState(false);
+ const [scheduledCount,setScheduledCount]=useState<number|null>(null);
+ const [testing,setTesting]=useState(false);
+ async function checkScheduled(){
+   try{const entries=await Notifications.getAllScheduledNotificationsAsync();setScheduledCount(entries.filter(n=>n.content.data?.kind==='task_due').length);}
+   catch(e){Alert.alert('Não foi possível consultar',String(e));}
+ }
+ async function sendTest(){
+   if(testing)return;
+   setTesting(true);
+   try{await testNotification();Alert.alert('Teste agendado','O Ping programou uma notificação para daqui a 10 segundos. Bloqueie a tela ou feche o app para verificar.');}
+   catch(e){Alert.alert('Teste não agendado',String(e));}
+   finally{setTesting(false);}
+ }
  async function chooseTheme(next:Appearance){
    if(themeBusy||next===appearance)return;
    setThemeBusy(true);
    try{await changeAppearance(next);}catch(e){Alert.alert('Não foi possível salvar o tema',String(e));}
    finally{setThemeBusy(false);}
  }
- useEffect(()=>{getPreferences().then(setPrefs).catch(console.warn);checkPermission();},[]);
+ useEffect(()=>{getPreferences().then(setPrefs).catch(console.warn);checkPermission();checkScheduled();},[]);
  async function checkPermission(){
    try{const result=await Notifications.getPermissionsAsync();setPermission(result.granted?'Permitidas':'Não permitidas');}
    catch{setPermission('Não foi possível verificar');}
@@ -78,6 +92,10 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
      <View style={s.row}><View style={s.copy}><Text style={s.title}>Lembretes ativos</Text><Text style={s.detail}>Ative ou pause os avisos de tarefas.</Text></View><Switch disabled={busy} value={prefs.notifications} onValueChange={v=>change('notifications',v)} trackColor={{false:c.border,true:c.accentSoft}} thumbColor={prefs.notifications?c.accent:c.muted}/></View>
      <View style={s.separator}/>
      <View style={s.row}><View style={s.copy}><Text style={s.title}>Ocultar detalhes</Text><Text style={s.detail}>Não mostrar o nome da tarefa no título ou corpo das novas notificações.</Text></View><Switch disabled={busy} value={prefs.privatePreviews} onValueChange={v=>change('privatePreviews',v)} trackColor={{false:c.border,true:c.accentSoft}} thumbColor={prefs.privatePreviews?c.accent:c.muted}/></View>
+     <View style={s.separator}/>
+     <Pressable accessibilityRole="button" style={s.row} onPress={checkScheduled}><View style={s.copy}><Text style={s.title}>Lembretes programados ↻</Text><Text style={s.detail}>{scheduledCount===null?'Toque para consultar':scheduledCount+' notificações de tarefas aguardando disparo. Toque para atualizar.'}</Text></View></Pressable>
+     <View style={s.separator}/>
+     <Pressable accessibilityRole="button" disabled={testing} style={s.row} onPress={sendTest}><View style={s.copy}><Text style={s.title}>Testar notificação em 10 segundos</Text><Text style={s.detail}>Agenda um aviso de teste para verificar a entrega pelo Android, inclusive com o aplicativo fechado.</Text></View></Pressable>
      <View style={s.separator}/>
      <Pressable style={s.row} onPress={()=>Linking.openSettings().catch(e=>Alert.alert('Erro',String(e)))}><View style={s.copy}><Text style={s.title}>Permissões do Android ↗</Text><Text style={s.detail}>Status: {permission}. Ajuste sons, alertas e permissões nas configurações do aparelho.</Text></View></Pressable>
    </View>
