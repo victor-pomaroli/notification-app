@@ -18,7 +18,16 @@ export function reminderMessage(category:TaskCategory,stage:ReminderStage,varian
  const vocativo=addressStyle==='masculine'?'campeão':addressStyle==='feminine'?'campeã':'pessoa';
  const message=options[Math.abs(variant)%options.length].replace(/\{vocativo\}/g,vocativo);
  const name=displayName.trim().slice(0,32);
- return name?name+', '+message.charAt(0).toLowerCase()+message.slice(1):message;
+ if(!name)return message;
+ // Alterna entre nome no início, no fim e nenhuma menção.
+ // A mesma tarefa mantém a escolha em todos os reagendamentos.
+ const position=Math.abs(variant+stage)%3;
+ if(position===0)return name+', '+message.charAt(0).toLowerCase()+message.slice(1);
+ if(position===1){
+   const punctuation=/[.!?]$/.test(message)?'':'';
+   return message+punctuation+' '+name+'.';
+ }
+ return message;
 }
 export function reminderOffsets(category: TaskCategory): readonly number[] {
   // Saúde usa um lembrete único por padrão; horários clínicos são definidos pelo usuário.
