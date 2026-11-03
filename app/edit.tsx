@@ -1,7 +1,9 @@
 import React,{useEffect,useState} from 'react';
-import {Text,TextInput,Pressable,ScrollView,StyleSheet,View,Modal} from 'react-native';
+import {Text,TextInput,Pressable,ScrollView,StyleSheet,View,Modal,Alert} from 'react-native';
 import {useLocalSearchParams,useRouter} from 'expo-router';
 import {getTask,saveTask} from '../src/store';
+import * as Notifications from 'expo-notifications';
+import {getPreferences} from '../src/preferences';
 import {categories,TaskCategory} from '../src/templates';
 import {useAppTheme,ThemeColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
@@ -42,8 +44,12 @@ export default function Edit(){
     if(saving)return;
     setSaving(true);
     try{
-      await saveTask({title:title.trim(),description,due_at:due.getTime(),priority,category},id?Number(id):undefined);
+      const result=await saveTask({title:title.trim(),description,due_at:due.getTime(),priority,category},id?Number(id):undefined);
+      const prefs=await getPreferences().catch(()=>null);
+      const permission=prefs?.notifications?await Notifications.getPermissionsAsync().catch(()=>null):null;
       router.back();
+      if(result.reminderError)Alert.alert('Tarefa salva','Não foi possível agendar o lembrete. Confira as notificações em Ajustes.');
+      else if(prefs?.notifications&&!permission?.granted)Alert.alert('Tarefa salva','As notificações não estão permitidas no Android. Ative a permissão em Ajustes para receber lembretes.');
     }catch(e){setFeedback({title:'Não deu para salvar.',message:String(e)});}
     finally{setSaving(false);}
   }
