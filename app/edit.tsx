@@ -92,7 +92,13 @@ export default function Edit(){
     <Text style={s.label}>04 / QUAL O ASSUNTO?</Text>
     <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=><Pressable key={key} style={[s.choice,{flexBasis:'29%'},category===key&&s.selected]} onPress={()=>setCategory(key)}><Text style={[s.choiceText,category===key&&s.selectedText]}>{({study:'📚',work:'💼',finance:'💸',home:'🏠',health:'💚',general:'✨'} as const)[key]} {categories[key]}</Text></Pressable>)}</View>
     <Text style={s.label}>05 / QUAL A URGÊNCIA?</Text>
-    <View style={s.row}>{(['low','medium','high'] as const).map((p,i)=><Pressable key={p} style={[s.choice,{borderColor:({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[p],borderWidth:1.5},priority===p&&{backgroundColor:({low:'#20392E',medium:'#41351F',high:'#432823'} as const)[p]}]} onPress={()=>setPriority(p)}><Text style={[s.choiceText,{color:({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[p]}]}>{['Baixa','Média','Alta'][i]}</Text></Pressable>)}</View>
+    <View style={s.row}>{(['low','medium','high'] as const).map((p,i)=>{
+      const color=({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[p];
+      return <Pressable key={p} style={[s.choice,priority===p&&{borderColor:c.muted}]} onPress={()=>setPriority(p)}>
+        <Text style={s.choiceText}>{['Baixa','Média','Alta'][i]}</Text>
+        <View style={[s.urgencyLine,{backgroundColor:color,opacity:priority===p?1:0.55,width:priority===p?38:25}]}/>
+      </Pressable>;
+    })}</View>
     {completed?<Text style={s.helper}>Esta tarefa já está concluída. Não será agendada uma nova notificação.</Text>:null}
     <Pressable style={[s.button,saving&&{opacity:0.6}]} disabled={saving} onPress={save}><Text style={s.buttonText}>{saving?'SALVANDO...':id?'SALVAR ALTERAÇÕES →':'CRIAR TAREFA →'}</Text></Pressable>
   </ScrollView></>;
@@ -107,6 +113,7 @@ const s=StyleSheet.create({
   row:{flexDirection:'row',gap:8},
   choice:{backgroundColor:c.surface,paddingVertical:15,paddingHorizontal:10,borderRadius:7,flex:1,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:c.border},
   choiceText:{color:c.text,fontWeight:'700',fontSize:12},
+  urgencyLine:{height:3,borderRadius:3,marginTop:8},
   selected:{backgroundColor:c.accentSoft,borderColor:c.accent},selectedText:{color:c.accent},
   helper:{color:c.muted,fontSize:12,marginTop:12,lineHeight:19},
   button:{backgroundColor:c.accent,alignItems:'center',padding:20,borderRadius:8,marginTop:32},
