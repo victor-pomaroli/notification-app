@@ -2,7 +2,7 @@ import React,{useCallback,useRef,useState} from 'react';
 import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar,Dimensions,Animated} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {Task,listTasks,completeTask,deleteTask} from '../src/store';
+import {Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,deleteTask} from '../src/store';
 import {categories,TaskCategory} from '../src/templates';
 import {useAppTheme,ThemeColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
@@ -20,6 +20,8 @@ export default function Home(){
   const {colors:c,appearance}=useAppTheme();
   const s=React.useMemo(()=>createStyles(c),[c]);
   const [tasks,setTasks]=useState<Task[]>([]);
+  const [taskPage,setTaskPage]=useState<Task[]>([]);
+  const [loadingPage,setLoadingPage]=useState(false);
   const [tab,setTab]=useState<Tab>('home');
   const [taskCategoryFilter,setTaskCategoryFilter]=useState<'all'|TaskCategory>('all');
   const [visibleTaskCount,setVisibleTaskCount]=useState(50);
@@ -35,7 +37,7 @@ export default function Home(){
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
   const router=useRouter();
   const insets=useSafeAreaInsets();
-  const refresh=useCallback(async()=>{setTasks(await listTasks());setNow(Date.now());},[]);
+  const refresh=useCallback(async()=>{await archiveOldCompletedTasks();const [all,page]=await Promise.all([listTasks(),listTaskPage(50,0)]);setTasks(all);setTaskPage(page);setVisibleTaskCount(50);setNow(Date.now());},[]);
   useFocusEffect(useCallback(()=>{
     refresh().catch(console.warn);
     const sub=AppState.addEventListener('change',state=>{if(state==='active')refresh().catch(console.warn);});
@@ -43,6 +45,9 @@ export default function Home(){
     return ()=>{sub.remove();clearInterval(interval);};
   },[refresh]));
   const filteredTasks=taskCategoryFilter==='all'?tasks:tasks.filter(t=>t.category===taskCategoryFilter);
+  const [filteredPage,setFilteredPage]=useState<Task[]>([]);
+  React.useEffect(()=>{let active=true;listTaskPage(50,0,taskCategoryFilter==='all'?undefined:taskCategoryFilter).then(rows=>{if(active){setFilteredPage(rows);setVisibleTaskCount(50);}}).catch(console.warn);return()=>{active=false;};},[taskCategoryFilter,tasks]);
+  async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.length,taskCategoryFilter==='all'?undefined:taskCategoryFilter);setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
   const pending=tasks.filter(t=>!t.completed);
   const overdue=pending.filter(t=>t.due_at<now);
   const upcoming=pending.filter(t=>t.due_at>=now);
@@ -110,9 +115,9 @@ export default function Home(){
       </>:<>
         <View style={s.sectionHead}><Text style={s.section}>{page==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(page==='tasks'?filteredTasks.length:overdue.length).padStart(2,'0')}</Text></View>
         {page==='tasks'?<View style={{marginBottom:18}}><View style={{flexDirection:'row',flexWrap:'wrap',gap:8,paddingVertical:3}}>{([{key:'all',label:'Todas'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={{paddingHorizontal:15,paddingVertical:11,borderRadius:999,borderWidth:1,borderColor:active?topic.text:c.border,backgroundColor:active?topic.surface:c.surface}}><Text style={{color:active?topic.text:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</View></View>:null}
-        {page==='tasks'?(filteredTasks.length?filteredTasks.slice(0,visibleTaskCount).map(card):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
+        {page==='tasks'?(filteredTasks.length?filteredPage.map(card):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
       </>}
-      {page==='tasks'&&filteredTasks.length>visibleTaskCount?<Pressable accessibilityRole="button" onPress={()=>setVisibleTaskCount(n=>n+50)} style={{backgroundColor:c.surface,borderRadius:9,padding:16,alignItems:'center',marginTop:20}}><Text style={{color:c.accent,fontWeight:'800'}}>CARREGAR MAIS ({filteredTasks.length-visibleTaskCount} RESTANTES)</Text></Pressable>:null}
+      {page==='tasks'&&filteredTasks.length>visibleTaskCount?<Pressable accessibilityRole="button" onPress={loadMoreTasks} style={{backgroundColor:c.surface,borderRadius:9,padding:16,alignItems:'center',marginTop:20}}><Text style={{color:c.accent,fontWeight:'800'}}>{loadingPage?'CARREGANDO...':`CARREGAR MAIS (${filteredTasks.length-visibleTaskCount} RESTANTES)`}</Text></Pressable>:null}
       <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>
       </>}
       </Animated.ScrollView>
