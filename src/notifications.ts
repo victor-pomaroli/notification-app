@@ -56,8 +56,9 @@ export async function cancelTaskReminders(ids:string[]){
 export async function testNotification(){
   const permission=await Notifications.getPermissionsAsync();
   if(!permission.granted)throw new Error('Permissão de notificações não concedida.');
+  const prefs=await getPreferences();
   return Notifications.scheduleNotificationAsync({
-    content:{title:'Teste do Ping! 👀',body:'Ô, criatura, seu lembrete de teste chegou!',data:{kind:'test'}},
+    content:{title:'Teste do Ping!',body:reminderMessage('general',0,0,prefs.displayName,prefs.addressStyle,prefs.personality),data:{kind:'test'}},
     trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(Date.now()+10000),
       ...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
   });
