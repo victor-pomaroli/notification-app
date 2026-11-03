@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.16",
-    "@react-native-community/datetimepicker": "9.2.1",
+    "@react-native-community/datetimepicker": "*",
     "expo": "~58.0.0",
     "expo-constants": "*",
     "expo-notifications": "*",
@@ -22,16 +22,12 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
-    "react-native-safe-area-context": "~5.10.1",
-    "react-native-screens": "*",
+    "react-native-android-widget": "^0.22.1",
     "react-native-safe-area-context": "*",
-    "@react-native-community/datetimepicker": "*",
-    "react-dom": "19.3.0",
-    "react-native-android-widget": "^0.22.1"
+    "react-native-screens": "*"
   },
   "devDependencies": {
-    "typescript": "~6.0.3",
-    "@types/react": "*"
+    "@types/react": "*",
+    "typescript": "~6.0.3"
   }
 }
-

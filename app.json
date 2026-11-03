@@ -1,8 +1,10 @@
+
 {
   "expo": {
-    "name": "Minhas Tarefas",
+    "name": "Ping",
     "slug": "minhas-tarefas",
     "scheme": "minhastarefas",
+    "icon": "./assets/icon.png",
     "plugins": [
       "expo-router",
       "expo-sqlite",
@@ -31,7 +33,11 @@
       ]
     ],
     "android": {
-      "package": "com.example.minhastarefas"
+      "package": "com.example.minhastarefas",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#F4F1E7"
+      }
     },
     "ios": {
       "bundleIdentifier": "com.example.minhastarefas"
