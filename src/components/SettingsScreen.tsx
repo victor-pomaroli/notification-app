@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
-import {View,Text,Switch,Pressable,StyleSheet,Alert,Linking} from 'react-native';
+import {View,Text,Switch,Pressable,StyleSheet,Alert,Linking,TextInput} from 'react-native';
 import * as Notifications from 'expo-notifications';
-import {getPreferences,setPreference,Preferences} from '../preferences';
+import {getPreferences,setPreference,Preferences,AddressStyle} from '../preferences';
 import {rescheduleAllReminders,deleteAllTasks} from '../store';
 import {testNotification} from '../notifications';
 import {useAppTheme,ThemeColors,Appearance,palettes} from '../theme';
@@ -9,12 +9,33 @@ import {useAppTheme,ThemeColors,Appearance,palettes} from '../theme';
 export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
  const {colors:c,appearance,changeAppearance}=useAppTheme();
  const s=React.useMemo(()=>createStyles(c),[c]);
- const [prefs,setPrefs]=useState<Preferences>({notifications:true,privatePreviews:false});
+ const [prefs,setPrefs]=useState<Preferences>({notifications:true,privatePreviews:false,appearance:'dark',displayName:'',addressStyle:'neutral'});
  const [busy,setBusy]=useState(false);
  const [permission,setPermission]=useState('Verificando...');
  const [themeBusy,setThemeBusy]=useState(false);
  const [scheduledCount,setScheduledCount]=useState<number|null>(null);
  const [testing,setTesting]=useState(false);
+ const [nameDraft,setNameDraft]=useState('');
+ useEffect(()=>{getPreferences().then(p=>setNameDraft(p.displayName)).catch(console.warn);},[]);
+ async function saveProfile(){
+   if(busy)return;
+   setBusy(true);
+   try{
+     const name=nameDraft.trim().slice(0,32);
+     await setPreference('displayName',name);
+     setPrefs(prev=>({...prev,displayName:name}));
+     await rescheduleAllReminders();
+     Alert.alert('Salvo','As próximas notificações vão usar seu nome.');
+   }catch(e){Alert.alert('Erro ao salvar perfil',String(e));}
+   finally{setBusy(false);}
+ }
+ async function chooseAddressStyle(value:AddressStyle){
+   if(busy)return;
+   setBusy(true);
+   try{await setPreference('addressStyle',value);setPrefs(prev=>({...prev,addressStyle:value}));await rescheduleAllReminders();}
+   catch(e){Alert.alert('Erro ao salvar tratamento',String(e));}
+   finally{setBusy(false);}
+ }
  async function checkScheduled(){
    try{const entries=await Notifications.getAllScheduledNotificationsAsync();setScheduledCount(entries.filter(n=>n.content.data?.kind==='task_due').length);}
    catch(e){Alert.alert('Não foi possível consultar',String(e));}
@@ -87,6 +108,18 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
        </Pressable>;
      })}
    </View>
+   <Text style={s.section}>SEU PERFIL</Text>
+   <Text style={s.detail}>Personalize como o Ping fala com você. Tudo fica salvo neste aparelho.</Text>
+   <View style={[s.panel,{marginTop:12,paddingVertical:14}]}>
+     <Text style={s.title}>Como podemos te chamar?</Text>
+     <TextInput accessibilityLabel="Nome para notificações" value={nameDraft} onChangeText={setNameDraft} maxLength={32} placeholder="Seu nome (opcional)" placeholderTextColor={c.muted} style={[s.nameInput,{color:c.text,borderColor:c.border,backgroundColor:c.background}]}/>
+     <Pressable accessibilityRole="button" disabled={busy} onPress={saveProfile} style={[s.saveButton,{backgroundColor:c.accent}]}><Text style={{color:c.background,fontWeight:'900'}}>SALVAR NOME</Text></Pressable>
+     <Text style={[s.title,{marginTop:18}]}>Como prefere ser tratado?</Text>
+     <Text style={s.detail}>Escolha o tom das expressões. Não precisa informar seu gênero.</Text>
+     <View style={s.addressRow}>
+       {([['masculine','Masculino'],['feminine','Feminino'],['neutral','Neutro']] as [AddressStyle,string][]).map(([key,label])=><Pressable key={key} accessibilityRole="radio" accessibilityState={{checked:prefs.addressStyle===key}} disabled={busy} onPress={()=>chooseAddressStyle(key)} style={[s.addressOption,{borderColor:prefs.addressStyle===key?c.accent:c.border,backgroundColor:prefs.addressStyle===key?c.accentSoft:c.background}]}><Text style={{color:prefs.addressStyle===key?c.text:c.muted,fontWeight:'700',fontSize:11}}>{label}</Text></Pressable>)}
+     </View>
+   </View>
    <Text style={s.section}>NOTIFICAÇÕES</Text>
    <View style={s.panel}>
      <View style={s.row}><View style={s.copy}><Text style={s.title}>Lembretes ativos</Text><Text style={s.detail}>Ative ou pause os avisos de tarefas.</Text></View><Switch disabled={busy} value={prefs.notifications} onValueChange={v=>change('notifications',v)} trackColor={{false:c.border,true:c.accentSoft}} thumbColor={prefs.notifications?c.accent:c.muted}/></View>
@@ -110,6 +143,10 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
  </View>;
 }
 const createStyles=(c:ThemeColors)=>StyleSheet.create({
+ nameInput:{borderWidth:1,borderRadius:9,paddingHorizontal:12,paddingVertical:12,marginTop:7},
+ saveButton:{alignItems:'center',padding:13,borderRadius:9,marginTop:10},
+ addressRow:{flexDirection:'row',gap:7,marginTop:12},
+ addressOption:{flex:1,alignItems:'center',borderWidth:1,borderRadius:9,paddingVertical:12,paddingHorizontal:3},
  themeRow:{flexDirection:'row',gap:12,marginTop:14},
  themeOption:{flex:1,padding:9,borderRadius:13,borderWidth:1,borderColor:c.border,backgroundColor:c.surface},
  themeOptionSelected:{borderColor:c.accent,borderWidth:2,padding:8},
