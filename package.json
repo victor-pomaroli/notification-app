@@ -5,20 +5,24 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "deps:fix": "expo install --fix",
     "deps:check": "expo install --check"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~58.0.16",
+    "@react-native-community/datetimepicker": "9.2.1",
     "expo": "~58.0.0",
+    "expo-constants": "*",
+    "expo-notifications": "*",
     "expo-router": "*",
     "expo-sqlite": "*",
-    "expo-notifications": "*",
-    "expo-constants": "*",
     "expo-status-bar": "*",
     "react": "19.3.0",
-    "react-native": "*",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "*",
     "react-native-safe-area-context": "*",
     "@react-native-community/datetimepicker": "*",
@@ -30,3 +34,4 @@
     "@types/react": "*"
   }
 }
+
