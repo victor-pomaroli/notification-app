@@ -30,6 +30,6 @@ export function ThemeProvider({children}:{children:React.ReactNode}){
     setAppearance(value);
   };
   const value=useMemo(()=>({colors:palettes[appearance],appearance,changeAppearance}),[appearance]);
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return React.createElement(ThemeContext.Provider,{value},children);
 }
 export const useAppTheme=()=>useContext(ThemeContext);
