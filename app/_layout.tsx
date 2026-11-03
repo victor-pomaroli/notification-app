@@ -14,7 +14,7 @@ function AppStack(){
   const [needsSetup,setNeedsSetup]=useState(false);
   useEffect(()=>{initDB().then(setupNotifications).then(reconcileReminders).catch(console.warn);},[]);
   useEffect(()=>{let active=true;initDB().then(needsOnboarding).then(needed=>{if(active){setNeedsSetup(needed);setReady(true);}}).catch(e=>{console.warn(e);if(active)setReady(true);});return()=>{active=false;};},[]);
-  useEffect(()=>{if(!ready)return;const onOnboarding=segments[0]==='onboarding';if(needsSetup&&!onOnboarding)router.replace('/onboarding');},[ready,needsSetup,segments,router]);
+  useEffect(()=>{if(!ready||segments[0]==='onboarding'||!needsSetup)return;let active=true;needsOnboarding().then(needed=>{if(!active)return;setNeedsSetup(needed);if(needed)router.replace('/onboarding');}).catch(console.warn);return()=>{active=false;};},[ready,needsSetup,segments,router]);
   if(!ready)return <View style={{flex:1,backgroundColor:theme.background,justifyContent:'center',alignItems:'center'}}><ActivityIndicator color={theme.accent}/></View>;
   return <><StatusBar style={appearance==='dark'?"light":"dark"}/><Stack screenOptions={{
     headerStyle:{backgroundColor:theme.background},headerTintColor:theme.text,
