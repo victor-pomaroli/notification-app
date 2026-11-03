@@ -100,8 +100,11 @@ export async function reconcileReminders(){
     // Rebuild only future occurrences when an expected scheduled ID disappeared.
     const rows=await db.getAllAsync<{notification_id:string;scheduled_at:number}>(
       'SELECT notification_id,scheduled_at FROM task_notifications WHERE task_id=?',task.id);
-    if(rows.some(r=>r.scheduled_at>Date.now()&&!available.has(r.notification_id)) ||
-       (!rows.length&&task.due_at>Date.now())){
+    const now=Date.now();
+    const {reminderOffsets}=await import('./templates');
+    const hasFutureStage=reminderOffsets(task.category).some(minutes=>task.due_at+minutes*60000>now);
+    if(rows.some(r=>r.scheduled_at>now&&!available.has(r.notification_id)) ||
+       (!rows.length&&hasFutureStage)){
       await replaceReminders(task.id,task,false);
     }
   }
