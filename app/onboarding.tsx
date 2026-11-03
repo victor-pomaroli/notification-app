@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,Pressable,ScrollView,StyleSheet,ActivityIndicator} from 'react-native';
 import {useRouter} from 'expo-router';
-import {useAppTheme,ThemeColors} from '../src/theme';
+import {useAppTheme,ThemeColors,Appearance,palettes} from '../src/theme';
 import {AddressStyle,NotificationPersonality,completeOnboarding,getPreferences} from '../src/preferences';
 import {rescheduleAllReminders} from '../src/store';
 
@@ -11,15 +11,17 @@ const personalities:[NotificationPersonality,string,string,string][]=[
   ['deBoa','🌿 De Boa','Leve e tranquilo.','Um lembrete gentil da sua tarefa.'],
 ];
 export default function Onboarding(){
-  const {colors:c}=useAppTheme();
+  const {colors:c,appearance,changeAppearance}=useAppTheme();
   const s=React.useMemo(()=>styles(c),[c]);
   const router=useRouter();
   const [step,setStep]=useState(0);
+  const [themeBusy,setThemeBusy]=useState(false);
   const [name,setName]=useState('');
   const [address,setAddress]=useState<AddressStyle>('neutral');
   const [personality,setPersonality]=useState<NotificationPersonality>('debochado');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  async function selectTheme(next:Appearance){if(themeBusy||next===appearance)return;setThemeBusy(true);try{await changeAppearance(next);}catch(e){setError('Não foi possível alterar o tema.');console.warn(e);}finally{setThemeBusy(false);}}
   useEffect(()=>{getPreferences().then(p=>{setName(p.displayName);setAddress(p.addressStyle);setPersonality(p.personality);}).catch(console.warn);},[]);
   async function finish(){
     if(busy)return;
@@ -33,10 +35,10 @@ export default function Onboarding(){
   }
   return <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
     <Text style={s.brand}>ping<Text style={{color:c.accent}}>.</Text></Text>
-    <Text style={s.eyebrow}>BEM-VINDO / {String(step+1).padStart(2,'0')} DE 03</Text>
+    <Text style={s.eyebrow}>BEM-VINDO / {String(step+1).padStart(2,'0')} DE 04</Text>
     <View style={s.progress}>{[0,1,2].map(i=><View key={i} style={[s.progressPart,{backgroundColor:i<=step?c.accent:c.border}]}/>)}</View>
-    <Text style={s.heading}>{['Primeiro,\nquem é você?','Como posso\nte chamar?','Qual é a\nsua vibe?'][step]}</Text>
-    <Text style={s.subtitle}>{['Vamos deixar os lembretes com a sua cara.','Escolha como o Ping deve se dirigir a você.','Escolha o jeito que o Ping vai cobrar suas tarefas.'][step]}</Text>
+    <Text style={s.heading}>{['Primeiro,\nquem é você?','Como posso\nte chamar?','Qual é a\nsua vibe?','Qual visual\ncombina com você?'][step]}</Text>
+    <Text style={s.subtitle}>{['Vamos deixar os lembretes com a sua cara.','Escolha como o Ping deve se dirigir a você.','Escolha o jeito que o Ping vai cobrar suas tarefas.','Escolha entre o tema escuro e o claro. Você pode mudar depois.'][step]}</Text>
     {step===0?<View style={s.panel}>
       <Text style={s.label}>SEU NOME (OPCIONAL)</Text>
       <TextInput accessibilityLabel="Seu nome" value={name} onChangeText={setName} maxLength={32} placeholder="Como quer ser chamado?" placeholderTextColor={c.muted} style={s.input}/>
@@ -52,11 +54,23 @@ export default function Onboarding(){
       <Text style={s.note}>{description}</Text>
       <Text style={[s.note,{backgroundColor:c.background,padding:10,borderRadius:7}]}>{preview}</Text>
     </Pressable>)}</View>:null}
+    {step===3?<View style={s.themeRow}>{(['dark','softLight'] as Appearance[]).map(key=>{const palette=palettes[key],selected=appearance===key;return <Pressable key={key} accessibilityRole="radio" accessibilityState={{checked:selected}} disabled={themeBusy} onPress={()=>selectTheme(key)} style={[s.themeOption,selected&&{borderColor:c.accent,borderWidth:2}]}>
+      <View style={[s.themePreview,{backgroundColor:palette.background,borderColor:palette.border}]}>
+        <View style={{height:9,width:44,backgroundColor:palette.accent,borderRadius:5}}/>
+        <View style={{backgroundColor:palette.surface,borderWidth:1,borderColor:palette.border,borderRadius:7,padding:12,gap:8}}>
+          <View style={{height:7,width:'85%',backgroundColor:palette.text,borderRadius:5}}/>
+          <View style={{height:6,width:'55%',backgroundColor:palette.muted,borderRadius:5}}/>
+        </View>
+        <View style={{height:20,backgroundColor:palette.surface,borderRadius:6,flexDirection:'row',justifyContent:'space-evenly',alignItems:'center'}}>{[0,1,2].map(i=><View key={i} style={{width:18,height:5,borderRadius:3,backgroundColor:i===0?palette.accent:palette.muted}}/>)}</View>
+      </View>
+      <Text style={s.themeName}>{key==='dark'?'Escuro original':'Claro suave'}</Text>
+      <Text style={[s.themeStatus,{color:selected?c.accent:c.muted}]}>{selected?'✓ SELECIONADO':'TOQUE PARA USAR'}</Text>
+    </Pressable>;})}</View>:null}
     {error?<Text style={{color:c.danger,marginTop:16}}>{error}</Text>:null}
     <View style={s.actions}>
       {step>0?<Pressable disabled={busy} style={s.back} onPress={()=>setStep(v=>v-1)}><Text style={{color:c.text,fontWeight:'800'}}>VOLTAR</Text></Pressable>:null}
-      <Pressable disabled={busy} style={[s.next,busy&&{opacity:0.6}]} onPress={()=>step===2?finish():setStep(v=>v+1)}>
-        {busy?<ActivityIndicator color={c.background}/>:<Text style={{color:c.background,fontWeight:'900'}}>{step===2?'COMEÇAR A USAR →':'CONTINUAR →'}</Text>}
+      <Pressable disabled={busy} style={[s.next,busy&&{opacity:0.6}]} onPress={()=>step===3?finish():setStep(v=>v+1)}>
+        {busy?<ActivityIndicator color={c.background}/>:<Text style={{color:c.background,fontWeight:'900'}}>{step===3?'COMEÇAR A USAR →':'CONTINUAR →'}</Text>}
       </Pressable>
     </View>
     <Text style={s.footer}>Você pode mudar tudo isso depois em Ajustes.</Text>
@@ -80,5 +94,10 @@ const styles=(c:ThemeColors)=>StyleSheet.create({
   actions:{flexDirection:'row',gap:10,marginTop:32},
   back:{padding:18,borderRadius:9,backgroundColor:c.surface,borderWidth:1,borderColor:c.border},
   next:{flex:1,padding:18,borderRadius:9,backgroundColor:c.accent,alignItems:'center'},
+  themeRow:{flexDirection:'row',gap:12},
+  themeOption:{flex:1,backgroundColor:c.surface,borderWidth:1,borderColor:c.border,borderRadius:12,padding:10},
+  themePreview:{height:155,borderWidth:1,borderRadius:9,padding:12,justifyContent:'space-between'},
+  themeName:{color:c.text,fontWeight:'800',fontSize:13,marginTop:12},
+  themeStatus:{fontSize:10,fontWeight:'800',marginTop:6},
   footer:{color:c.muted,textAlign:'center',fontSize:12,marginTop:20}
 });
