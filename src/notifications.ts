@@ -1,52 +1,61 @@
 import * as Notifications from 'expo-notifications';
 import {Platform} from 'react-native';
+import {reminderMessage,reminderOffsets,TaskCategory,ReminderStage} from './templates';
 
 Notifications.setNotificationHandler({
   handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false}),
 });
-
+const CHANNEL='tasks';
+export type ScheduledReminder={notification_id:string;stage:number;scheduled_at:number};
+export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory};
 export async function setupNotifications(){
-  if(Platform.OS==='android'){
-    await Notifications.setNotificationChannelAsync('tasks',{
-      name:'Vencimento de tarefas',importance:Notifications.AndroidImportance.HIGH,
-    });
-  }
-  const current=await Notifications.getPermissionsAsync();
-  if(!current.granted && current.canAskAgain) {
-    const requested=await Notifications.requestPermissionsAsync();
-    console.log('[notifications] permission after request:',requested.status);
-  } else {
-    console.log('[notifications] permission:',current.status);
-  }
-}
-
-export async function scheduleTask(title:string,dueAt:number){
-  if(dueAt<=Date.now()) {
-    console.warn('[notifications] Due date is in the past:',new Date(dueAt).toISOString());
-    return null;
-  }
-  const permission=await Notifications.getPermissionsAsync();
-  if(!permission.granted) {
-    console.warn('[notifications] Permission not granted:',permission.status);
-    return null;
-  }
-  const id=await Notifications.scheduleNotificationAsync({
-    content:{title:'Prazo da tarefa chegou',body:title,data:{kind:'task_due'}},
-    trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(dueAt),
-      ...(Platform.OS==='android'?{channelId:'tasks'}:{})},
+  if(Platform.OS==='android') await Notifications.setNotificationChannelAsync(CHANNEL,{
+    name:'Lembretes de tarefas',importance:Notifications.AndroidImportance.HIGH,
   });
-  const pending=await Notifications.getAllScheduledNotificationsAsync();
-  console.log('[notifications] scheduled:',id,'pending count:',pending.length,'due:',new Date(dueAt).toISOString());
-  return id;
+  const current=await Notifications.getPermissionsAsync();
+  if(!current.granted && current.canAskAgain) await Notifications.requestPermissionsAsync();
 }
-
+function allowedTime(timestamp:number){
+  // Silêncio das 22h às 7h: desloca para 7h da manhã local.
+  const date=new Date(timestamp);
+  if(date.getHours()>=22){date.setDate(date.getDate()+1);date.setHours(7,0,0,0);}
+  else if(date.getHours()<7) date.setHours(7,0,0,0);
+  return date.getTime();
+}
+export async function scheduleTaskReminders(task:ReminderTask):Promise<ScheduledReminder[]>{
+  const permission=await Notifications.getPermissionsAsync();
+  if(!permission.granted){console.warn('[notifications] Permission not granted');return [];}
+  const result:ScheduledReminder[]=[];
+  try{
+    const offsets=reminderOffsets(task.category);
+    const used=new Set<number>();
+    for(let stage=0;stage<offsets.length;stage++){
+      const at=allowedTime(task.due_at+offsets[stage]*60000);
+      if(at<=Date.now()||used.has(at))continue;
+      used.add(at);
+      const id=await Notifications.scheduleNotificationAsync({
+        content:{
+          title:task.title,
+          body:reminderMessage(task.category,stage as ReminderStage,task.id+stage),
+          data:{kind:'task_due',taskId:task.id,stage},
+        },
+        trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(at),
+          ...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
+      });
+      result.push({notification_id:id,stage,scheduled_at:at});
+    }
+    return result;
+  }catch(e){await cancelTaskReminders(result.map(x=>x.notification_id));throw e;}
+}
+export async function cancelTaskReminders(ids:string[]){
+  await Promise.all(ids.map(id=>Notifications.cancelScheduledNotificationAsync(id).catch(console.warn)));
+}
 export async function testNotification(){
-  const dueAt=Date.now()+10000;
-  const id=await scheduleTask('Teste de notificação em 10 segundos',dueAt);
-  if(!id) throw new Error('Notificações não autorizadas ou horário inválido.');
-  return id;
-}
-
-export async function cancelTaskNotification(id:string|null){
-  if(id) await Notifications.cancelScheduledNotificationAsync(id).catch(()=>{});
+  const permission=await Notifications.getPermissionsAsync();
+  if(!permission.granted)throw new Error('Permissão de notificações não concedida.');
+  return Notifications.scheduleNotificationAsync({
+    content:{title:'Teste do Ping! 👀',body:'Ô, criatura, seu lembrete de teste chegou!',data:{kind:'test'}},
+    trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(Date.now()+10000),
+      ...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
+  });
 }

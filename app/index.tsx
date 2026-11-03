@@ -1,17 +1,21 @@
 import React,{useCallback,useState} from 'react';
-import {View,Text,ScrollView,Pressable,StyleSheet,Alert,AppState} from 'react-native';
+import {View,Text,ScrollView,Pressable,StyleSheet,Alert,AppState,StatusBar} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Task,listTasks,completeTask,deleteTask} from '../src/store';
-import {cancelTaskNotification,scheduleTask} from '../src/notifications';
+import {categories} from '../src/templates';
 import {theme as c} from '../src/theme';
+
 type Tab='home'|'tasks'|'alerts';
-const priorityLabel={low:'Baixa',medium:'Média',high:'Alta'};
-const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
+const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'];
 export default function Home(){
   const [tasks,setTasks]=useState<Task[]>([]);
   const [tab,setTab]=useState<Tab>('home');
   const [now,setNow]=useState(Date.now());
   const router=useRouter();
+  const insets=useSafeAreaInsets();
   const refresh=useCallback(async()=>{setTasks(await listTasks());setNow(Date.now());},[]);
   useFocusEffect(useCallback(()=>{
     refresh().catch(console.warn);
@@ -24,82 +28,83 @@ export default function Home(){
   const upcoming=pending.filter(t=>t.due_at>=now);
   const today=pending.filter(t=>new Date(t.due_at).toDateString()===new Date(now).toDateString());
   async function toggle(t:Task){
-    try{
-      if(!t.completed){
-        await cancelTaskNotification(t.notification_id);
-        await completeTask(t.id,true,null);
-      }else{
-        const id=await scheduleTask(t.title,t.due_at);
-        await completeTask(t.id,false,id);
-      }
-      await refresh();
-    }catch(e){Alert.alert('Erro ao atualizar',String(e));}
+    try{await completeTask(t.id,!t.completed);await refresh();}
+    catch(e){Alert.alert('Erro ao atualizar',String(e));}
   }
   function remove(t:Task){
     Alert.alert('Excluir tarefa?',t.title,[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:async()=>{
-      try{await cancelTaskNotification(t.notification_id);await deleteTask(t.id);await refresh();}
+      try{await deleteTask(t.id);await refresh();}
       catch(e){Alert.alert('Erro ao excluir',String(e));}
     }}]);
   }
   function card(t:Task){
     const late=!t.completed&&t.due_at<now;
-    return <Pressable key={t.id} style={s.card} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,t.completed&&s.checked]}>
+    return <Pressable key={t.id} style={s.task} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+      <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,t.completed&&s.checked]}>
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
-      <View style={{flex:1,gap:5}}><Text style={[s.taskTitle,t.completed&&s.completed]}>{t.title}</Text>
-        <Text style={s.muted}>{formatDate(t.due_at)} · {priorityLabel[t.priority]}</Text>
+      <View style={{flex:1,gap:7}}>
+        <Text style={[s.taskTitle,t.completed&&s.completed]}>{t.title}</Text>
+        <Text style={s.meta}>{categories[t.category]??'Geral'}  /  {formatDate(t.due_at)}</Text>
       </View>
-      {late?<Text style={s.late}>Atrasada</Text>:null}
+      {late?<Text style={s.late}>ATRASOU</Text>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
     </Pressable>;
   }
   const empty=(message:string)=><Text style={s.empty}>{message}</Text>;
   return <View style={s.root}>
+    <StatusBar barStyle="light-content"/>
     <ScrollView contentContainerStyle={s.container}>
-      <Text style={s.eyebrow}>ORGANIZE SEU DIA</Text>
-      <Text style={s.heading}>{tab==='home'?'Seu dia':tab==='tasks'?'Todas as tarefas':'Alertas'}</Text>
+      <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
+      <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
+      <Text style={s.heading}>{tab==='home'?'Seu dia.\nSem desculpas.':tab==='tasks'?'Tudo na\nmesma lista.':'Olha o que\nficou pra trás.'}</Text>
       {tab==='home'?<>
-        <View style={s.stats}>
-          <View style={s.stat}><Text style={s.statNumber}>{today.length}</Text><Text style={s.statLabel}>Hoje</Text></View>
-          <View style={s.stat}><Text style={[s.statNumber,{color:c.danger}]}>{overdue.length}</Text><Text style={s.statLabel}>Atrasadas</Text></View>
-          <View style={s.stat}><Text style={s.statNumber}>{pending.length}</Text><Text style={s.statLabel}>Pendentes</Text></View>
+        <View style={s.hero}>
+          <Text style={s.heroLabel}>O RESUMO DA ÓPERA</Text>
+          <View style={s.heroNumbers}><Text style={s.heroNumber}>{pending.length.toString().padStart(2,'0')}</Text><View style={s.heroSide}><Text style={s.heroSideBig}>{overdue.length} atrasadas</Text><Text style={s.heroSideSmall}>{today.length} pra hoje</Text></View></View>
+          <Text style={s.heroFooter}>{pending.length===0?'Tudo resolvido. Aproveita esse raro momento.':overdue.length?'Tem coisa te esperando. Você sabe o que fazer.':'Por enquanto, tudo sob controle.'}</Text>
         </View>
-        <Text style={s.section}>Precisam de atenção</Text>
-        {overdue.length?overdue.map(card):empty('Nenhuma tarefa atrasada. Tudo em dia!')}
-        <Text style={s.section}>Próximas tarefas</Text>
-        {upcoming.length?upcoming.slice(0,8).map(card):empty('Nenhuma tarefa futura cadastrada.')}
-      </>:tab==='tasks'?<>
-        <Text style={s.description}>Toque para editar · segure para excluir</Text>
-        {tasks.length?tasks.map(card):empty('Você ainda não cadastrou tarefas.')}
+        <View style={s.sectionHead}><Text style={s.section}>PASSOU DA HORA</Text><Text style={s.sectionCount}>{String(overdue.length).padStart(2,'0')}</Text></View>
+        {overdue.length?overdue.map(card):empty('Nada atrasado. Pode comemorar sem exagerar.')}
+        <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
+        {upcoming.length?upcoming.slice(0,8).map(card):empty('Nenhuma tarefa futura. Que paz suspeita.')}
       </>:<>
-        <Text style={s.description}>Tarefas com prazo expirado e ainda não concluídas.</Text>
-        {overdue.length?overdue.map(card):empty('Nenhum alerta pendente.')}
+        <View style={s.sectionHead}><Text style={s.section}>{tab==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(tab==='tasks'?tasks.length:overdue.length).padStart(2,'0')}</Text></View>
+        {tab==='tasks'?(tasks.length?tasks.map(card):empty('Ainda não tem nada aqui. Crie sua primeira tarefa.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
       </>}
+      <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>
     </ScrollView>
-    <Pressable accessibilityLabel="Criar tarefa" style={s.add} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>
-    <View style={s.nav}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={s.navItem} onPress={()=>setTab(key)}>
-      <Text style={[s.navText,tab===key&&s.navActive]}>{['Início','Tarefas','Alertas'][i]}</Text>
+    <Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>
+    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]]}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>setTab(key)}>
+      <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS'][i]}</Text>
       {tab===key?<View style={s.dot}/>:null}
     </Pressable>)}</View>
   </View>;
 }
 const s=StyleSheet.create({
-  root:{flex:1,backgroundColor:c.background},container:{padding:20,paddingBottom:120},
-  eyebrow:{color:c.accent,fontSize:11,fontWeight:'800',letterSpacing:2,marginTop:10},
-  heading:{color:c.text,fontSize:32,fontWeight:'800',marginTop:6,marginBottom:24},
-  stats:{flexDirection:'row',gap:10,marginBottom:20},stat:{flex:1,backgroundColor:c.surface,padding:14,borderRadius:18,borderWidth:1,borderColor:c.border},
-  statNumber:{color:c.text,fontSize:27,fontWeight:'800'},statLabel:{color:c.muted,fontSize:12,marginTop:5},
-  section:{color:c.text,fontSize:18,fontWeight:'700',marginTop:18,marginBottom:12},
-  card:{backgroundColor:c.surface,padding:15,borderRadius:16,marginBottom:10,flexDirection:'row',alignItems:'center',gap:12,borderWidth:1,borderColor:c.border},
-  check:{width:28,height:28,borderRadius:9,borderWidth:2,borderColor:c.accent,alignItems:'center',justifyContent:'center'},
-  checked:{backgroundColor:c.success,borderColor:c.success},checkText:{color:c.background,fontWeight:'900',fontSize:17},
-  taskTitle:{color:c.text,fontSize:15,fontWeight:'700'},completed:{textDecorationLine:'line-through',color:c.muted},
-  muted:{color:c.muted,fontSize:12},late:{color:c.danger,fontSize:11,fontWeight:'800'},
-  empty:{color:c.muted,backgroundColor:c.surface,padding:18,borderRadius:14,overflow:'hidden'},
-  description:{color:c.muted,marginBottom:16,fontSize:13},
-  add:{position:'absolute',bottom:87,right:20,backgroundColor:c.accent,height:58,width:58,borderRadius:19,alignItems:'center',justifyContent:'center',elevation:6},
-  plus:{color:c.background,fontSize:32,fontWeight:'500',lineHeight:39},
-  nav:{height:72,backgroundColor:c.surface,flexDirection:'row',borderTopWidth:1,borderTopColor:c.border},
-  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navText:{color:c.muted,fontSize:13,fontWeight:'700'},
-  navActive:{color:c.accent},dot:{width:5,height:5,borderRadius:3,backgroundColor:c.accent},
+  root:{flex:1,backgroundColor:c.background},container:{paddingHorizontal:23,paddingTop:18,paddingBottom:140},
+  brand:{flexDirection:'row',alignItems:'center',marginBottom:43,gap:9},brandMark:{width:28,height:28,borderRadius:7,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',transform:[{rotate:'-9deg'}]},
+  brandMarkText:{fontSize:21,fontWeight:'900',color:c.background},brandName:{color:c.text,fontSize:25,fontWeight:'900',letterSpacing:-1.5},
+  brandCaption:{color:c.muted,fontSize:9,fontWeight:'800',letterSpacing:1.3,marginLeft:'auto'},
+  eyebrow:{color:c.accent,fontSize:10,fontWeight:'900',letterSpacing:2.5,marginBottom:13},
+  heading:{color:c.text,fontSize:48,fontWeight:'900',lineHeight:51,letterSpacing:-2.5,marginBottom:29},
+  hero:{backgroundColor:c.accent,borderRadius:8,padding:23,marginBottom:33,transform:[{rotate:'-1deg'}]},
+  heroLabel:{color:c.background,fontWeight:'900',letterSpacing:2,fontSize:10},
+  heroNumbers:{flexDirection:'row',alignItems:'center',gap:20,marginTop:6},
+  heroNumber:{color:c.background,fontSize:89,fontWeight:'900',letterSpacing:-7},
+  heroSide:{gap:7},heroSideBig:{color:c.background,fontWeight:'900',fontSize:17},heroSideSmall:{color:c.background,fontWeight:'600',fontSize:14},
+  heroFooter:{color:c.background,fontWeight:'700',fontSize:12,marginTop:5,lineHeight:19},
+  sectionHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderBottomWidth:1,borderBottomColor:c.border,paddingBottom:12,marginTop:12,marginBottom:5},
+  section:{color:c.text,fontSize:12,fontWeight:'900',letterSpacing:1.5},sectionCount:{color:c.accent,fontSize:14,fontWeight:'900'},
+  task:{paddingVertical:19,flexDirection:'row',alignItems:'center',gap:14,borderBottomWidth:1,borderBottomColor:c.border},
+  check:{width:27,height:27,borderRadius:6,borderWidth:2,borderColor:c.muted,alignItems:'center',justifyContent:'center'},
+  checked:{backgroundColor:c.accent,borderColor:c.accent},checkText:{color:c.background,fontWeight:'900',fontSize:16},
+  taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},completed:{textDecorationLine:'line-through',color:c.muted},
+  meta:{color:c.muted,fontSize:11},late:{color:c.danger,fontSize:10,fontWeight:'900',letterSpacing:0.8},
+  priority:{color:c.muted,fontSize:9,fontWeight:'800'},empty:{color:c.muted,paddingVertical:23,fontSize:13,lineHeight:20},
+  tip:{color:c.muted,fontSize:9,letterSpacing:1.1,marginTop:35,textAlign:'center'},
+  add:{position:'absolute',bottom:91,right:23,backgroundColor:c.accent,height:61,width:61,borderRadius:12,alignItems:'center',justifyContent:'center',elevation:7},
+  plus:{color:c.background,fontSize:38,fontWeight:'500',lineHeight:47},
+  nav:{height:75,backgroundColor:c.surface,flexDirection:'row',borderTopWidth:1,borderTopColor:c.border,paddingHorizontal:12},
+  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navSelected:{},navText:{color:c.muted,fontSize:10,fontWeight:'900',letterSpacing:1.4},
+  navActive:{color:c.accent},dot:{width:16,height:3,borderRadius:3,backgroundColor:c.accent},
 });
