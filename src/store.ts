@@ -26,6 +26,7 @@ const ready=(async()=>{
   if(!cols.some(c=>c.name==='archived_at'))await db.execAsync('ALTER TABLE tasks ADD COLUMN archived_at INTEGER');
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(completed,due_at)');
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_archive ON tasks(archived_at,completed_at)');
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_active_category ON tasks(archived_at,category,completed,due_at,id)');
   await db.runAsync('UPDATE tasks SET completed_at=due_at WHERE completed=1 AND completed_at IS NULL');
   await db.runAsync('UPDATE tasks SET archived_at=completed_at+2592000000 WHERE completed=1 AND archived_at IS NULL AND completed_at<=?',Date.now()-2592000000);
   return db;
@@ -33,6 +34,7 @@ const ready=(async()=>{
 export async function initDB(){await ready;}
 async function refreshWidget(){try{const {Platform}=await import('react-native');if(Platform.OS==='android')await (await import('./widget/sync')).refreshPingWidget();}catch(e){console.warn('[widget] Refresh failed:',e);}}
 export async function listTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY completed ASC,due_at ASC');}
+export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){const db=await ready;return category?db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND category=? ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?',category,limit,offset):db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?',limit,offset);}
 export async function listArchivedTasks(limit=50,offset=0){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NOT NULL ORDER BY archived_at DESC LIMIT ? OFFSET ?',limit,offset);}
 export async function archiveTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=? WHERE id=? AND completed=1',Date.now(),id);await refreshWidget();}
 export async function restoreArchivedTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=NULL WHERE id=?',id);await refreshWidget();}
@@ -93,6 +95,7 @@ export async function deleteTask(id:number){
 }
 export async function reconcileReminders(){
   const db=await ready;
+  await archiveOldCompletedTasks();
   const prefs=await getPreferences();
   if(!prefs.notifications){
     const rows=await db.getAllAsync<{notification_id:string}>('SELECT notification_id FROM task_notifications');
@@ -103,8 +106,7 @@ export async function reconcileReminders(){
   }
   const pending=await (await import('expo-notifications')).getAllScheduledNotificationsAsync();
   const available=new Set(pending.map(n=>n.identifier));
-  await archiveOldCompletedTasks();
-  const tasks=await listTasks();
+  const tasks=await (await ready).getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 AND archived_at IS NULL ORDER BY due_at ASC');
   const notificationRows=await db.getAllAsync<{task_id:number;notification_id:string;scheduled_at:number}>('SELECT task_id,notification_id,scheduled_at FROM task_notifications');
   const byTask=new Map<number,typeof notificationRows>();
   for(const row of notificationRows){const group=byTask.get(row.task_id)??[];group.push(row);byTask.set(row.task_id,group);}
