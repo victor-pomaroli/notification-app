@@ -88,7 +88,7 @@ export default function Home(){
       <Text style={s.heading}>{page==='home'?'Seu dia.\nSem desculpas.':page==='tasks'?'Tudo na\nmesma lista.':'Olha o que\nficou pra trás.'}</Text>
       {page==='home'?<>
         <View style={s.hero}>
-          <View pointerEvents="none" style={s.postitFoldShadow}/>
+          <View pointerEvents="none" style={s.postitCornerCut}/>
           <View pointerEvents="none" style={s.postitFold}/>
           <Text style={s.heroLabel}>O RESUMO DA ÓPERA</Text>
           <View style={s.heroNumbers}><Text style={s.heroNumber}>{pending.length.toString().padStart(2,'0')}</Text><View style={s.heroSide}><Text style={s.heroSideBig}>{overdue.length} atrasadas</Text><Text style={s.heroSideSmall}>{today.length} pra hoje</Text></View></View>
@@ -138,9 +138,9 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   brandCaption:{color:c.muted,fontSize:9,fontWeight:'800',letterSpacing:1.3,marginLeft:'auto'},
   eyebrow:{color:c.accent,fontSize:10,fontWeight:'900',letterSpacing:2.5,marginBottom:13},
   heading:{color:c.text,fontSize:40,fontWeight:'900',lineHeight:43,letterSpacing:-2,marginBottom:22},
-  hero:{backgroundColor:c.accent,borderRadius:5,padding:23,marginBottom:33,transform:[{rotate:'-1deg'}],overflow:'visible',elevation:5},
-  postitFoldShadow:{position:'absolute',top:-1,right:-1,width:0,height:0,borderTopWidth:39,borderLeftWidth:39,borderTopColor:c.background,borderLeftColor:'transparent',zIndex:1},
-  postitFold:{position:'absolute',top:0,right:0,width:0,height:0,borderBottomWidth:35,borderRightWidth:35,borderBottomColor:c.accentSoft,borderRightColor:'transparent',transform:[{translateX:-1},{translateY:1}],zIndex:2},
+  hero:{backgroundColor:c.accent,borderRadius:4,padding:23,marginBottom:33,transform:[{rotate:'-1deg'}],overflow:'visible',elevation:c.background==='#111310'?3:0,shadowColor:'#000000',shadowOffset:{width:0,height:3},shadowOpacity:c.background==='#111310'?0.12:0,shadowRadius:6},
+  postitCornerCut:{position:'absolute',top:-1,right:-1,width:0,height:0,borderTopWidth:25,borderLeftWidth:25,borderTopColor:c.background,borderLeftColor:'transparent',zIndex:2},
+  postitFold:{position:'absolute',top:0,right:0,width:0,height:0,borderBottomWidth:23,borderRightWidth:23,borderBottomColor:c.background==='#111310'?'#B5D653':'#77964A',borderRightColor:'transparent',zIndex:3,transform:[{translateX:-1},{translateY:1}]},
   heroLabel:{color:c.background,fontWeight:'900',letterSpacing:2,fontSize:10},
   heroNumbers:{flexDirection:'row',alignItems:'center',gap:20,marginTop:6},
   heroNumber:{color:c.background,fontSize:89,fontWeight:'900',letterSpacing:-7},
