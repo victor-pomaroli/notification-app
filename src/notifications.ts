@@ -39,7 +39,7 @@ export async function scheduleTaskReminders(task:ReminderTask):Promise<Scheduled
       const id=await Notifications.scheduleNotificationAsync({
         content:{
           title:prefs.privatePreviews?'Ping · lembrete':task.title,
-          body:prefs.privatePreviews?'Você tem uma tarefa esperando. Abra o Ping para conferir.':reminderMessage(task.category,stage as ReminderStage,task.id+stage),
+          body:prefs.privatePreviews?'Você tem uma tarefa esperando. Abra o Ping para conferir.':reminderMessage(task.category,stage as ReminderStage,task.id+stage,prefs.displayName,prefs.addressStyle),
           data:{kind:'task_due',taskId:task.id,stage},
         },
         trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(at),
