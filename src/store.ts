@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import {getPreferences} from './preferences';
 import {TaskCategory} from './templates';
 import {cancelTaskReminders,scheduleTaskReminders,ScheduledReminder} from './notifications';
 export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;notification_id:string|null};
@@ -79,6 +80,14 @@ export async function deleteTask(id:number){
 }
 export async function reconcileReminders(){
   const db=await ready;
+  const prefs=await getPreferences();
+  if(!prefs.notifications){
+    const rows=await db.getAllAsync<{notification_id:string}>('SELECT notification_id FROM task_notifications');
+    await cancelTaskReminders(rows.map(row=>row.notification_id));
+    await db.runAsync('DELETE FROM task_notifications');
+    await db.runAsync('UPDATE tasks SET notification_id=NULL');
+    return;
+  }
   const pending=await (await import('expo-notifications')).getAllScheduledNotificationsAsync();
   const available=new Set(pending.map(n=>n.identifier));
   const tasks=await listTasks();
@@ -96,4 +105,18 @@ export async function reconcileReminders(){
       await replaceReminders(task.id,task,false);
     }
   }
+}
+
+export async function rescheduleAllReminders(){
+  const db=await ready;
+  const tasks=await listTasks();
+  for(const task of tasks)await replaceReminders(task.id,task,!!task.completed);
+}
+export async function deleteAllTasks(){
+  const db=await ready;
+  const rows=await db.getAllAsync<{notification_id:string}>('SELECT notification_id FROM task_notifications');
+  await cancelTaskReminders(rows.map(row=>row.notification_id));
+  await db.runAsync('DELETE FROM task_notifications');
+  await db.runAsync('DELETE FROM tasks');
+  await refreshWidget();
 }
