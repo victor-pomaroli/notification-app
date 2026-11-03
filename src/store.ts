@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import {getPreferences} from './preferences';
+import {reminderOffsets} from './templates';
 import {TaskCategory} from './templates';
 import {cancelTaskReminders,scheduleTaskReminders,ScheduledReminder} from './notifications';
 export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;notification_id:string|null};
@@ -21,11 +22,13 @@ const ready=(async()=>{
   CREATE INDEX IF NOT EXISTS idx_task_notifications_task ON task_notifications(task_id);`);
   const cols=await db.getAllAsync<{name:string}>('PRAGMA table_info(tasks)');
   if(!cols.some(c=>c.name==='category'))await db.execAsync("ALTER TABLE tasks ADD COLUMN category TEXT NOT NULL DEFAULT 'general'");
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(completed,due_at)');
   return db;
 })();
 export async function initDB(){await ready;}
 async function refreshWidget(){try{const {Platform}=await import('react-native');if(Platform.OS==='android')await (await import('./widget/sync')).refreshPingWidget();}catch(e){console.warn('[widget] Refresh failed:',e);}}
 export async function listTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks ORDER BY completed ASC,due_at ASC');}
+export async function listWidgetTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 ORDER BY id DESC LIMIT 5');}
 export async function getTask(id:number){const db=await ready;return db.getFirstAsync<Task>('SELECT * FROM tasks WHERE id=?',id);}
 async function reminderIds(id:number){
   const db=await ready;
@@ -91,17 +94,18 @@ export async function reconcileReminders(){
   const pending=await (await import('expo-notifications')).getAllScheduledNotificationsAsync();
   const available=new Set(pending.map(n=>n.identifier));
   const tasks=await listTasks();
+  const notificationRows=await db.getAllAsync<{task_id:number;notification_id:string;scheduled_at:number}>('SELECT task_id,notification_id,scheduled_at FROM task_notifications');
+  const byTask=new Map<number,typeof notificationRows>();
+  for(const row of notificationRows){const group=byTask.get(row.task_id)??[];group.push(row);byTask.set(row.task_id,group);}
+  const now=Date.now();
   for(const task of tasks){
-    const ids=await reminderIds(task.id);
+    const rows=byTask.get(task.id)??[];
+    const ids=rows.map(r=>r.notification_id);
     if(task.completed){
       if(ids.length)await replaceReminders(task.id,task,true);
       continue;
     }
     // Rebuild only future occurrences when an expected scheduled ID disappeared.
-    const rows=await db.getAllAsync<{notification_id:string;scheduled_at:number}>(
-      'SELECT notification_id,scheduled_at FROM task_notifications WHERE task_id=?',task.id);
-    const now=Date.now();
-    const {reminderOffsets}=await import('./templates');
     const hasFutureStage=reminderOffsets(task.category).some(minutes=>task.due_at+minutes*60000>now);
     if(rows.some(r=>r.scheduled_at>now&&!available.has(r.notification_id)) ||
        (!rows.length&&hasFutureStage)){
