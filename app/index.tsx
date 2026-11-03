@@ -1,5 +1,5 @@
 import React,{useCallback,useRef,useState} from 'react';
-import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar,Dimensions} from 'react-native';
+import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar,Dimensions,Animated} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Task,listTasks,completeTask,deleteTask} from '../src/store';
@@ -16,21 +16,8 @@ export default function Home(){
   const [tasks,setTasks]=useState<Task[]>([]);
   const [tab,setTab]=useState<Tab>('home');
   const pager=useRef<ScrollView>(null);
-  const verticalOffsets=useRef<Record<Tab,number>>({home:0,tasks:0,alerts:0,settings:0});
-  const [headerShift,setHeaderShift]=useState(0);
-  const [headerOpacity,setHeaderOpacity]=useState(1);
-  const updateHeader=(offset:number)=>{
-    const distance=Math.max(0,offset);
-    setHeaderShift(Math.min(120,distance));
-    setHeaderOpacity(Math.max(0,Math.min(1,(70-distance)/25)));
-  };
-  const syncHeader=(x:number)=>{
-    const position=Math.max(0,Math.min(3,x/pageWidth));
-    const left=Math.floor(position),right=Math.min(3,left+1),fraction=position-left;
-    const offsets=verticalOffsets.current;
-    const distance=offsets[tabs[left]]*(1-fraction)+offsets[tabs[right]]*fraction;
-    updateHeader(distance);
-  };
+  const horizontalX=useRef(new Animated.Value(0)).current;
+  const verticalY=useRef({home:new Animated.Value(0),tasks:new Animated.Value(0),alerts:new Animated.Value(0),settings:new Animated.Value(0)}).current;
   const [pageWidth,setPageWidth]=useState(Dimensions.get('window').width);
   const tabs:Tab[]=['home','tasks','alerts','settings'];
   const goToTab=(next:Tab)=>{setTab(next);pager.current?.scrollTo({x:tabs.indexOf(next)*pageWidth,animated:true});};
@@ -84,14 +71,15 @@ export default function Home(){
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
     <StatusBar barStyle="light-content"/>
-    <ScrollView ref={pager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
+    <Animated.ScrollView ref={pager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
       style={{flex:1}} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
-      onScroll={event=>syncHeader(event.nativeEvent.contentOffset.x)}
+      onScroll={Animated.event([{nativeEvent:{contentOffset:{x:horizontalX}}}],{useNativeDriver:true})}
       onLayout={event=>{const width=event.nativeEvent.layout.width;if(width>0&&width!==pageWidth){setPageWidth(width);pager.current?.scrollTo({x:tabs.indexOf(tab)*width,animated:false});}}}
       onMomentumScrollEnd={event=>{const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));setTab(tabs[index]);}}
     >
-      {tabs.map(page=><ScrollView key={page} style={{width:pageWidth}} contentContainerStyle={[s.container,{paddingTop:insets.top+89}]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
-        onScroll={event=>{verticalOffsets.current[page]=event.nativeEvent.contentOffset.y;if(page===tab)updateHeader(event.nativeEvent.contentOffset.y);}}>
+      {tabs.map((page,index)=><View key={page} style={{width:pageWidth,flex:1}}>
+      <Animated.ScrollView style={{flex:1}} contentContainerStyle={[s.container,{paddingTop:insets.top+89}]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
+        onScroll={Animated.event([{nativeEvent:{contentOffset:{y:verticalY[page]}}}],{useNativeDriver:true})}>
 
       {page==='settings'?<SettingsScreen onDataDeleted={()=>refresh().catch(console.warn)}/>:<>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
@@ -112,11 +100,25 @@ export default function Home(){
       </>}
       <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>
       </>}
-      </ScrollView>)}
-    </ScrollView>
-    <View pointerEvents="none" style={[s.sharedBrand,{top:insets.top+18-headerShift,opacity:headerOpacity}]}>
-      <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
-    </View>
+      </Animated.ScrollView>
+      <Animated.View pointerEvents="none" style={[s.sharedBrand,{
+        top:insets.top+18,
+        transform:[
+          {translateX:Animated.subtract(horizontalX,index*pageWidth)},
+          {translateY:verticalY[page].interpolate({inputRange:[0,110],outputRange:[0,-110],extrapolate:'clamp'})}
+        ],
+        opacity:Animated.multiply(
+          verticalY[page].interpolate({inputRange:[0,45,75],outputRange:[1,1,0],extrapolate:'clamp'}),
+          horizontalX.interpolate({
+            inputRange:[(index-1)*pageWidth,index*pageWidth,(index+1)*pageWidth],
+            outputRange:[0,1,0],extrapolate:'clamp'
+          })
+        )
+      }]}>
+        <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
+      </Animated.View>
+      </View>)}
+    </Animated.ScrollView>
     {tab!=='settings'&&<Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>}
     <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts','settings'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
       <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS','AJUSTES'][i]}</Text>
