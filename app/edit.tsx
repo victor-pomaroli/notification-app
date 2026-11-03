@@ -58,10 +58,21 @@ export default function Edit(){
     <Text style={s.label}>02 / ALGUM DETALHE?</Text>
     <TextInput style={[s.input,{height:105,textAlignVertical:'top'}]} placeholderTextColor={c.muted} multiline value={description} onChangeText={setDescription} placeholder="Detalhes opcionais"/>
     <Text style={s.label}>03 / QUANDO?</Text>
-    <View style={s.row}>
-      <Pressable style={s.choice} onPress={()=>openPicker('date')}><Text style={s.choiceText}>{due.toLocaleDateString('pt-BR')}</Text></Pressable>
-      <Pressable style={s.choice} onPress={()=>openPicker('time')}><Text style={s.choiceText}>{due.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</Text></Pressable>
+    <View style={s.scheduleCard}>
+      <Pressable style={s.scheduleRow} onPress={()=>openPicker('date')}>
+        <Text style={s.scheduleSymbol}>▦</Text>
+        <View style={{flex:1}}><Text style={s.scheduleCaption}>DATA DO LEMBRETE</Text><Text style={s.scheduleValue}>{due.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</Text></View>
+        <Text style={s.scheduleArrow}>›</Text>
+      </Pressable>
+      <View style={s.scheduleDivider}/>
+      <Pressable style={s.scheduleRow} onPress={()=>openPicker('time')}>
+        <Text style={s.scheduleSymbol}>◷</Text>
+        <View style={{flex:1}}><Text style={s.scheduleCaption}>HORÁRIO</Text><Text style={s.scheduleValue}>{due.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</Text></View>
+        <Text style={s.scheduleArrow}>›</Text>
+      </Pressable>
     </View>
+    <Text style={s.scheduleCaptionQuick}>ATALHOS RÁPIDOS</Text>
+    <View style={s.row}>{([{label:'Hoje',days:0},{label:'Amanhã',days:1},{label:'+7 dias',days:7}] as const).map(item=><Pressable key={item.label} style={s.quickChip} onPress={()=>{const next=new Date();next.setDate(next.getDate()+item.days);next.setHours(due.getHours(),due.getMinutes(),0,0);setDue(next);}}><Text style={s.quickText}>{item.label}</Text></Pressable>)}</View>
     <Modal visible={picker!==null} transparent animationType="fade" onRequestClose={()=>setPicker(null)}>
       <View style={s.modalOverlay}><View style={s.modalCard}>
         <Text style={s.modalTitle}>{picker==='date'?'ESCOLHA O DIA':'ESCOLHA A HORA'}</Text>
@@ -120,6 +131,16 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   helper:{color:c.muted,fontSize:12,marginTop:12,lineHeight:19},
   button:{backgroundColor:c.accent,alignItems:'center',padding:20,borderRadius:8,marginTop:32},
   buttonText:{color:c.background,fontWeight:'900',fontSize:14,letterSpacing:1.2},
+  scheduleCard:{backgroundColor:c.surface,borderRadius:12,borderWidth:1,borderColor:c.border,padding:15},
+  scheduleRow:{flexDirection:'row',alignItems:'center',gap:14,paddingVertical:8},
+  scheduleSymbol:{fontSize:27,color:c.accent,backgroundColor:c.accentSoft,overflow:'hidden',borderRadius:9,textAlign:'center',textAlignVertical:'center',width:43,height:43},
+  scheduleCaption:{color:c.muted,fontSize:10,fontWeight:'800',letterSpacing:1,marginBottom:5},
+  scheduleValue:{color:c.text,fontSize:16,fontWeight:'800',textTransform:'capitalize'},
+  scheduleArrow:{color:c.accent,fontSize:26},
+  scheduleDivider:{height:1,backgroundColor:c.border,marginVertical:10},
+  scheduleCaptionQuick:{color:c.muted,fontSize:10,fontWeight:'800',letterSpacing:1,marginTop:17,marginBottom:10},
+  quickChip:{backgroundColor:c.surfaceRaised,borderWidth:1,borderColor:c.border,borderRadius:99,paddingHorizontal:14,paddingVertical:11,flex:1,alignItems:'center'},
+  quickText:{color:c.text,fontWeight:'800',fontSize:12},
   modalOverlay:{flex:1,backgroundColor:'#000000B8',justifyContent:'center',padding:20},
   modalCard:{backgroundColor:c.surfaceRaised,borderRadius:16,padding:20,borderWidth:1,borderColor:c.border},
   modalTitle:{color:c.accent,fontSize:12,fontWeight:'900',letterSpacing:2,marginBottom:22},
