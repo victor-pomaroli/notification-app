@@ -36,7 +36,7 @@ export default function Onboarding(){
   return <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
     <Text style={s.brand}>ping<Text style={{color:c.accent}}>.</Text></Text>
     <Text style={s.eyebrow}>BEM-VINDO / {String(step+1).padStart(2,'0')} DE 04</Text>
-    <View style={s.progress}>{[0,1,2].map(i=><View key={i} style={[s.progressPart,{backgroundColor:i<=step?c.accent:c.border}]}/>)}</View>
+    <View style={s.progress}>{[0,1,2,3].map(i=><View key={i} style={[s.progressPart,{backgroundColor:i<=step?c.accent:c.border}]}/>)}</View>
     <Text style={s.heading}>{['Primeiro,\nquem é você?','Como posso\nte chamar?','Qual é a\nsua vibe?','Qual visual\ncombina com você?'][step]}</Text>
     <Text style={s.subtitle}>{['Vamos deixar os lembretes com a sua cara.','Escolha como o Ping deve se dirigir a você.','Escolha o jeito que o Ping vai cobrar suas tarefas.','Escolha entre o tema escuro e o claro. Você pode mudar depois.'][step]}</Text>
     {step===0?<View style={s.panel}>
