@@ -129,7 +129,7 @@ export async function reconcileReminders(){
 
 export async function rescheduleAllReminders(){
   const db=await ready;
-  const tasks=await listTasks();
+  const tasks=await db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 AND archived_at IS NULL ORDER BY due_at ASC');
   for(const task of tasks)await replaceReminders(task.id,task,!!task.completed);
 }
 export async function deleteAllTasks(){
