@@ -119,11 +119,31 @@ export default function Home(){
       </Animated.View>
       </View>)}
     </Animated.ScrollView>
-    {tab!=='settings'&&<Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>}
-    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts','settings'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
-      <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS','AJUSTES'][i]}</Text>
-      {tab===key?<View style={s.dot}/>:null}
-    </Pressable>)}</View>
+    {tab!=='settings'&&<Pressable accessibilityRole="button" accessibilityLabel="Criar tarefa" style={[s.add,{bottom:105+insets.bottom}]} onPress={()=>router.push('/edit')}>
+      <Text style={s.plus}>+</Text>
+    </Pressable>}
+    <View style={[s.navArea,{paddingBottom:Math.max(insets.bottom,10)}]}>
+      <View style={s.nav}>
+        {tabs.map((key,i)=>{
+          const progress=horizontalX.interpolate({
+            inputRange:[(i-1)*pageWidth,i*pageWidth,(i+1)*pageWidth],
+            outputRange:[0,1,0],extrapolate:'clamp'
+          });
+          return <Pressable key={key} accessibilityRole="tab" accessibilityState={{selected:tab===key}}
+            accessibilityLabel={['Hoje','Tarefas','Atrasos','Ajustes'][i]}
+            style={s.navItem} onPress={()=>goToTab(key)}>
+            <Animated.View style={[s.navPill,{opacity:progress,transform:[{scale:progress.interpolate({inputRange:[0,1],outputRange:[0.88,1]})}]}]}/>
+            <Animated.Text style={[s.navIcon,{color:progress.interpolate({inputRange:[0,1],outputRange:[c.muted,c.accent]})}]}>
+              {['⌂','☷','◷','⚙'][i]}
+            </Animated.Text>
+            <Animated.Text style={[s.navText,{color:progress.interpolate({inputRange:[0,1],outputRange:[c.muted,c.text]})}]}>
+              {['HOJE','TAREFAS','ATRASOS','AJUSTES'][i]}
+            </Animated.Text>
+            <Animated.View style={[s.navIndicator,{opacity:progress}]}/>
+          </Pressable>;
+        })}
+      </View>
+    </View>
   </View>;
 }
 const s=StyleSheet.create({
@@ -151,9 +171,13 @@ const s=StyleSheet.create({
   priorityWrap:{alignItems:'center',justifyContent:'center',gap:6},
   priorityLine:{width:28,height:3,borderRadius:3},empty:{color:c.muted,paddingVertical:23,fontSize:13,lineHeight:20},
   tip:{color:c.muted,fontSize:9,letterSpacing:1.1,marginTop:35,textAlign:'center'},
-  add:{position:'absolute',bottom:91,right:23,backgroundColor:c.accent,height:61,width:61,borderRadius:12,alignItems:'center',justifyContent:'center',elevation:7},
+  add:{position:'absolute',right:24,backgroundColor:c.accent,height:58,width:58,borderRadius:19,alignItems:'center',justifyContent:'center',elevation:8,zIndex:3},
   plus:{color:c.background,fontSize:38,fontWeight:'500',lineHeight:47},
-  nav:{height:75,backgroundColor:c.surface,flexDirection:'row',borderTopWidth:1,borderTopColor:c.border,paddingHorizontal:12},
-  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navSelected:{},navText:{color:c.muted,fontSize:10,fontWeight:'900',letterSpacing:1.4},
-  navActive:{color:c.accent},dot:{width:16,height:3,borderRadius:3,backgroundColor:c.accent},
+  navArea:{paddingTop:10,paddingHorizontal:16,backgroundColor:c.background},
+  nav:{height:74,backgroundColor:c.surface,borderRadius:23,borderWidth:1,borderColor:c.border,flexDirection:'row',padding:6,elevation:7},
+  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:3,position:'relative',overflow:'hidden',borderRadius:17},
+  navPill:{position:'absolute',top:0,bottom:0,left:0,right:0,backgroundColor:c.accentSoft,borderRadius:17},
+  navIcon:{fontSize:23,fontWeight:'600',lineHeight:28,includeFontPadding:false},
+  navText:{fontSize:9,fontWeight:'900',letterSpacing:0.65},
+  navIndicator:{position:'absolute',bottom:3,width:17,height:3,borderRadius:3,backgroundColor:c.accent},
 });
