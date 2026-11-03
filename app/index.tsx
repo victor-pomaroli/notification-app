@@ -18,12 +18,18 @@ export default function Home(){
   const pager=useRef<ScrollView>(null);
   const verticalOffsets=useRef<Record<Tab,number>>({home:0,tasks:0,alerts:0,settings:0});
   const [headerShift,setHeaderShift]=useState(0);
+  const [headerOpacity,setHeaderOpacity]=useState(1);
+  const updateHeader=(offset:number)=>{
+    const distance=Math.max(0,offset);
+    setHeaderShift(Math.min(120,distance));
+    setHeaderOpacity(Math.max(0,Math.min(1,(70-distance)/25)));
+  };
   const syncHeader=(x:number)=>{
     const position=Math.max(0,Math.min(3,x/pageWidth));
     const left=Math.floor(position),right=Math.min(3,left+1),fraction=position-left;
     const offsets=verticalOffsets.current;
     const distance=offsets[tabs[left]]*(1-fraction)+offsets[tabs[right]]*fraction;
-    setHeaderShift(Math.min(71,Math.max(0,distance)));
+    updateHeader(distance);
   };
   const [pageWidth,setPageWidth]=useState(Dimensions.get('window').width);
   const tabs:Tab[]=['home','tasks','alerts','settings'];
@@ -85,7 +91,7 @@ export default function Home(){
       onMomentumScrollEnd={event=>{const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));setTab(tabs[index]);}}
     >
       {tabs.map(page=><ScrollView key={page} style={{width:pageWidth}} contentContainerStyle={[s.container,{paddingTop:insets.top+89}]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
-        onScroll={event=>{verticalOffsets.current[page]=event.nativeEvent.contentOffset.y;if(page===tab)setHeaderShift(Math.min(71,Math.max(0,event.nativeEvent.contentOffset.y)));}}>
+        onScroll={event=>{verticalOffsets.current[page]=event.nativeEvent.contentOffset.y;if(page===tab)updateHeader(event.nativeEvent.contentOffset.y);}}>
 
       {page==='settings'?<SettingsScreen onDataDeleted={()=>refresh().catch(console.warn)}/>:<>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
@@ -108,7 +114,7 @@ export default function Home(){
       </>}
       </ScrollView>)}
     </ScrollView>
-    <View pointerEvents="none" style={[s.sharedBrand,{top:insets.top+18-headerShift}]}>
+    <View pointerEvents="none" style={[s.sharedBrand,{top:insets.top+18-headerShift,opacity:headerOpacity}]}>
       <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
     </View>
     {tab!=='settings'&&<Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>}
