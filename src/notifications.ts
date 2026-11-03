@@ -58,7 +58,7 @@ export async function testNotification(){
   if(!permission.granted)throw new Error('Permissão de notificações não concedida.');
   const prefs=await getPreferences();
   return Notifications.scheduleNotificationAsync({
-    content:{title:'Teste do Ping!',body:reminderMessage('general',0,0,prefs.displayName,prefs.addressStyle,prefs.personality),data:{kind:'test'}},
+    content:{title:prefs.privatePreviews?'Ping - lembrete':'Teste do Ping!',body:prefs.privatePreviews?'Abra o Ping para conferir seu lembrete.':reminderMessage('general',0,0,prefs.displayName,prefs.addressStyle,prefs.personality),data:{kind:'test'}},
     trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(Date.now()+10000),
       ...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
   });
