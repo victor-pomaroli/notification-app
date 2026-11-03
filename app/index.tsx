@@ -72,7 +72,7 @@ export default function Home(){
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
     <StatusBar barStyle="light-content"/>
-    <ScrollView contentContainerStyle={s.container}
+    <ScrollView contentContainerStyle={[s.container,{paddingTop:insets.top+18}]}
       onTouchStart={event=>{touchStart.current={x:event.nativeEvent.pageX,y:event.nativeEvent.pageY};}}
       onTouchEnd={event=>onSwipeEnd(event.nativeEvent.pageX,event.nativeEvent.pageY)}
       onTouchCancel={()=>{touchStart.current=null;}}
