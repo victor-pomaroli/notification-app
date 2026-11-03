@@ -64,7 +64,10 @@ export default function Home(){
         <Text style={[s.taskTitle,t.completed&&s.completed]}>{t.title}</Text>
         <Text style={s.meta}>{categories[t.category]??'Geral'}  /  {formatDate(t.due_at)}</Text>
       </View>
-      {late?<Text style={s.late}>ATRASOU</Text>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
+      <View style={s.priorityWrap}>
+        {late?<Text style={s.late}>ATRASOU</Text>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
+        <View style={[s.priorityLine,{backgroundColor:({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[t.priority]}]}/>
+      </View>
     </Pressable>;
   }
   const empty=(message:string)=><Text style={s.empty}>{message}</Text>;
@@ -123,7 +126,9 @@ const s=StyleSheet.create({
   checked:{backgroundColor:c.accent,borderColor:c.accent},checkText:{color:c.background,fontWeight:'900',fontSize:16},
   taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},completed:{textDecorationLine:'line-through',color:c.muted},
   meta:{color:c.muted,fontSize:11},late:{color:c.danger,fontSize:10,fontWeight:'900',letterSpacing:0.8},
-  priority:{color:c.muted,fontSize:9,fontWeight:'800'},empty:{color:c.muted,paddingVertical:23,fontSize:13,lineHeight:20},
+  priority:{color:c.muted,fontSize:9,fontWeight:'800'},
+  priorityWrap:{alignItems:'center',justifyContent:'center',gap:6},
+  priorityLine:{width:28,height:3,borderRadius:3},empty:{color:c.muted,paddingVertical:23,fontSize:13,lineHeight:20},
   tip:{color:c.muted,fontSize:9,letterSpacing:1.1,marginTop:35,textAlign:'center'},
   add:{position:'absolute',bottom:91,right:23,backgroundColor:c.accent,height:61,width:61,borderRadius:12,alignItems:'center',justifyContent:'center',elevation:7},
   plus:{color:c.background,fontSize:38,fontWeight:'500',lineHeight:47},
