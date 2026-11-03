@@ -3,9 +3,11 @@ import {Text,TextInput,Pressable,ScrollView,StyleSheet,View,Modal} from 'react-n
 import {useLocalSearchParams,useRouter} from 'expo-router';
 import {getTask,saveTask} from '../src/store';
 import {categories,TaskCategory} from '../src/templates';
-import {theme as c} from '../src/theme';
+import {useAppTheme,ThemeColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 export default function Edit(){
+  const {colors:c}=useAppTheme();
+  const s=React.useMemo(()=>createStyles(c),[c]);
   const {id}=useLocalSearchParams<{id?:string}>();
   const router=useRouter();
   const [title,setTitle]=useState('');
@@ -103,7 +105,7 @@ export default function Edit(){
     <Pressable style={[s.button,saving&&{opacity:0.6}]} disabled={saving} onPress={save}><Text style={s.buttonText}>{saving?'SALVANDO...':id?'SALVAR ALTERAÇÕES →':'CRIAR TAREFA →'}</Text></Pressable>
   </ScrollView></>;
 }
-const s=StyleSheet.create({
+const createStyles=(c:ThemeColors)=>StyleSheet.create({
   container:{paddingHorizontal:23,paddingTop:28,paddingBottom:80,backgroundColor:c.background,flexGrow:1},
   kicker:{color:c.accent,fontWeight:'900',fontSize:10,letterSpacing:2.5,marginBottom:15},
   heading:{color:c.text,fontSize:47,fontWeight:'900',lineHeight:49,letterSpacing:-2,marginBottom:8},
