@@ -1,4 +1,4 @@
-import React,{useCallback,useState} from 'react';
+import React,{useCallback,useRef,useState} from 'react';
 import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO
 export default function Home(){
   const [tasks,setTasks]=useState<Task[]>([]);
   const [tab,setTab]=useState<Tab>('home');
+  const touchStart=useRef<{x:number;y:number}|null>(null);
   const [now,setNow]=useState(Date.now());
   const [deleteTarget,setDeleteTarget]=useState<Task|null>(null);
   const [busyDelete,setBusyDelete]=useState(false);
@@ -27,6 +28,16 @@ export default function Home(){
     const interval=setInterval(()=>setNow(Date.now()),30000);
     return ()=>{sub.remove();clearInterval(interval);};
   },[refresh]));
+  const onSwipeEnd=(x:number,y:number)=>{
+    const start=touchStart.current;
+    touchStart.current=null;
+    if(!start)return;
+    const dx=x-start.x;
+    const dy=y-start.y;
+    if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.3)return;
+    const tabs:Tab[]=['home','tasks','alerts'];
+    setTab(current=>tabs[Math.max(0,Math.min(tabs.length-1,tabs.indexOf(current)+(dx<0?1:-1)))]);
+  };
   const pending=tasks.filter(t=>!t.completed);
   const overdue=pending.filter(t=>t.due_at<now);
   const upcoming=pending.filter(t=>t.due_at>=now);
@@ -61,7 +72,11 @@ export default function Home(){
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
     <StatusBar barStyle="light-content"/>
-    <ScrollView contentContainerStyle={s.container}>
+    <ScrollView contentContainerStyle={s.container}
+      onTouchStart={event=>{touchStart.current={x:event.nativeEvent.pageX,y:event.nativeEvent.pageY};}}
+      onTouchEnd={event=>onSwipeEnd(event.nativeEvent.pageX,event.nativeEvent.pageY)}
+      onTouchCancel={()=>{touchStart.current=null;}}
+    >
       <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
       <Text style={s.heading}>{tab==='home'?'Seu dia.\nSem desculpas.':tab==='tasks'?'Tudo na\nmesma lista.':'Olha o que\nficou pra trás.'}</Text>
