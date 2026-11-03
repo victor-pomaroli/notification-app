@@ -1,7 +1,7 @@
 import React from 'react';
 import {Modal,View,Text,Pressable,StyleSheet,ActivityIndicator} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {theme as c} from '../theme';
+import {useAppTheme,ThemeColors} from '../theme';
 
 type Props={
   visible:boolean;
@@ -17,6 +17,8 @@ type Props={
 };
 export function PingDialog({visible,eyebrow='PING / ATENÇÃO',title,message,confirmLabel='ENTENDI',cancelLabel,onConfirm,onClose,destructive=false,busy=false}:Props){
   const insets=useSafeAreaInsets();
+  const {colors:c}=useAppTheme();
+  const s=React.useMemo(()=>createStyles(c),[c]);
   return <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
     <View style={s.overlay}>
       <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Fechar diálogo" onPress={busy?undefined:onClose}/>
@@ -35,7 +37,7 @@ export function PingDialog({visible,eyebrow='PING / ATENÇÃO',title,message,con
     </View>
   </Modal>;
 }
-const s=StyleSheet.create({
+const createStyles=(c:ThemeColors)=>StyleSheet.create({
   overlay:{flex:1,backgroundColor:'rgba(0,0,0,0.72)',justifyContent:'flex-end',paddingHorizontal:12},
   sheet:{backgroundColor:c.surfaceRaised,borderRadius:15,paddingHorizontal:24,paddingTop:14,paddingBottom:24,borderWidth:1,borderColor:c.border},
   handle:{width:40,height:4,borderRadius:3,backgroundColor:c.border,alignSelf:'center',marginBottom:28},
