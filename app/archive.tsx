@@ -32,7 +32,7 @@ export default function Archive(){
    <Text style={{color:c.muted,marginBottom:18}}>Tarefas concluídas há mais de 30 dias são arquivadas automaticamente. Toque para restaurar à lista.</Text>
    <FlatList data={tasks} keyExtractor={t=>String(t.id)} onEndReached={()=>{if(hasMore&&!loading)load();}} onEndReachedThreshold={0.4}
     ListEmptyComponent={<Text style={{color:c.muted,paddingVertical:20}}>Nenhuma tarefa arquivada.</Text>}
-    ListFooterComponent={hasMore?<Pressable disabled={loading} onPress={()=>load()} style={{padding:18,alignItems:'center'}}><Text style={{color:c.accent}}>{loading?'Carregando...':'Carregar mais'}</Text></Pressable>:null}
+    ListFooterComponent={hasMore?<Pressable disabled={loading} onPress={()=>load()} style={{padding:18,alignItems:'center'}}><Text style={{color:c.accent}}>{loading?'Carregando...':'Carregar mais'}</Text></Pressable>:undefined}
     renderItem={({item})=><Pressable onPress={()=>restore(item)} style={{borderBottomWidth:1,borderColor:c.border,paddingVertical:17,gap:5}}>
       <Text style={{color:c.text,fontSize:16,fontWeight:'800'}} numberOfLines={2}>{item.title}</Text>
       <Text style={{color:c.muted,fontSize:12}}>{categories[item.category]??'Geral'} · Concluída {new Date(item.completed_at??item.due_at).toLocaleDateString('pt-BR')}</Text>
