@@ -1,11 +1,12 @@
 import React,{useEffect,useState} from 'react';
-import {Text,TextInput,Pressable,ScrollView,StyleSheet,Alert,Platform,View} from 'react-native';
+import {Text,TextInput,Pressable,ScrollView,StyleSheet,Platform,View} from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {useLocalSearchParams,useRouter} from 'expo-router';
 import {getTask,saveTask} from '../src/store';
 import {categories,TaskCategory} from '../src/templates';
 import {testNotification} from '../src/notifications';
 import {theme as c} from '../src/theme';
+import {PingDialog} from '../src/components/PingDialog';
 export default function Edit(){
   const {id}=useLocalSearchParams<{id?:string}>();
   const router=useRouter();
@@ -17,18 +18,21 @@ export default function Edit(){
   const [completed,setCompleted]=useState(false);
   const [picker,setPicker]=useState<'date'|'time'|null>(null);
   const [saving,setSaving]=useState(false);
+  const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
   useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);setDescription(t.description);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);}}).catch(console.warn);},[id]);
   async function save(){
-    if(!title.trim())return Alert.alert('Informe um título');
+    if(!title.trim()){setFeedback({title:'Faltou o principal.',message:'Dá um nome para essa tarefa antes de continuar.'});return;}
     if(saving)return;
     setSaving(true);
     try{
       await saveTask({title:title.trim(),description,due_at:due.getTime(),priority,category},id?Number(id):undefined);
       router.back();
-    }catch(e){Alert.alert('Erro ao salvar',String(e));}
+    }catch(e){setFeedback({title:'Não deu para salvar.',message:String(e)});}
     finally{setSaving(false);}
   }
-  return <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
+  return <>
+  <PingDialog visible={!!feedback} eyebrow="PING / RECADO" title={feedback?.title??''} message={feedback?.message} confirmLabel="ENTENDI" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
+  <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
     <Text style={s.kicker}>PING / ORGANIZAÇÃO</Text>
     <Text style={s.heading}>{id?'Muda os\nplanos.':'Qual é a\nmissão?'}</Text>
     <Text style={s.subtitle}>Anota agora. A gente te cobra depois.</Text>
@@ -51,9 +55,9 @@ export default function Edit(){
     <Text style={s.label}>05 / QUAL A URGÊNCIA?</Text>
     <View style={s.row}>{(['low','medium','high'] as const).map((p,i)=><Pressable key={p} style={[s.choice,priority===p&&s.selected]} onPress={()=>setPriority(p)}><Text style={[s.choiceText,priority===p&&s.selectedText]}>{['Baixa','Média','Alta'][i]}</Text></Pressable>)}</View>
     {completed?<Text style={s.helper}>Esta tarefa já está concluída. Não será agendada uma nova notificação.</Text>:null}
-    <Pressable style={[s.choice,{marginTop:20}]} onPress={async()=>{try{await testNotification();Alert.alert('Teste agendado','A notificação de teste deve aparecer em cerca de 10 segundos. Confira também o terminal do Expo.');}catch(e){Alert.alert('Falha no teste',String(e));}}}><Text style={s.choiceText}>TESTAR PING · 10 SEG</Text></Pressable>
+    <Pressable style={[s.choice,{marginTop:20}]} onPress={async()=>{try{await testNotification();setFeedback({title:'Ping a caminho.',message:'O teste foi agendado para daqui a 10 segundos. Confira as notificações do aparelho.'});}catch(e){setFeedback({title:'O teste falhou.',message:String(e)});}}}><Text style={s.choiceText}>TESTAR PING · 10 SEG</Text></Pressable>
     <Pressable style={[s.button,saving&&{opacity:0.6}]} disabled={saving} onPress={save}><Text style={s.buttonText}>{saving?'SALVANDO...':id?'SALVAR ALTERAÇÕES →':'CRIAR TAREFA →'}</Text></Pressable>
-  </ScrollView>;
+  </ScrollView></>;
 }
 const s=StyleSheet.create({
   container:{paddingHorizontal:23,paddingTop:28,paddingBottom:80,backgroundColor:c.background,flexGrow:1},
