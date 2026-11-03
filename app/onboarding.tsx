@@ -1,8 +1,8 @@
-import React,{useState} from 'react';
+import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,Pressable,ScrollView,StyleSheet,ActivityIndicator} from 'react-native';
 import {useRouter} from 'expo-router';
 import {useAppTheme,ThemeColors} from '../src/theme';
-import {AddressStyle,NotificationPersonality,completeOnboarding} from '../src/preferences';
+import {AddressStyle,NotificationPersonality,completeOnboarding,getPreferences} from '../src/preferences';
 import {rescheduleAllReminders} from '../src/store';
 
 const personalities:[NotificationPersonality,string,string,string][]=[
@@ -20,6 +20,7 @@ export default function Onboarding(){
   const [personality,setPersonality]=useState<NotificationPersonality>('debochado');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  useEffect(()=>{getPreferences().then(p=>{setName(p.displayName);setAddress(p.addressStyle);setPersonality(p.personality);}).catch(console.warn);},[]);
   async function finish(){
     if(busy)return;
     setBusy(true);setError('');
