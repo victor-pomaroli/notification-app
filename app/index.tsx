@@ -20,7 +20,6 @@ export default function Home(){
   const {colors:c,appearance}=useAppTheme();
   const s=React.useMemo(()=>createStyles(c),[c]);
   const [tasks,setTasks]=useState<Task[]>([]);
-  const [taskPage,setTaskPage]=useState<Task[]>([]);
   const [loadingPage,setLoadingPage]=useState(false);
   const [tab,setTab]=useState<Tab>('home');
   const [taskCategoryFilter,setTaskCategoryFilter]=useState<'all'|TaskCategory>('all');
@@ -37,7 +36,7 @@ export default function Home(){
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
   const router=useRouter();
   const insets=useSafeAreaInsets();
-  const refresh=useCallback(async()=>{await archiveOldCompletedTasks();const [all,page]=await Promise.all([listTasks(),listTaskPage(50,0)]);setTasks(all);setTaskPage(page);setVisibleTaskCount(50);setNow(Date.now());},[]);
+  const refresh=useCallback(async()=>{await archiveOldCompletedTasks();const all=await listTasks();setTasks(all);setVisibleTaskCount(50);setNow(Date.now());},[]);
   useFocusEffect(useCallback(()=>{
     refresh().catch(console.warn);
     const sub=AppState.addEventListener('change',state=>{if(state==='active')refresh().catch(console.warn);});
