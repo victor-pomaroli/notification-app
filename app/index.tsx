@@ -17,6 +17,7 @@ export default function Home(){
   const s=React.useMemo(()=>createStyles(c),[c]);
   const [tasks,setTasks]=useState<Task[]>([]);
   const [tab,setTab]=useState<Tab>('home');
+  const [taskCategoryFilter,setTaskCategoryFilter]=useState<'all'|TaskCategory>('all');
   const pager=useRef<React.ElementRef<typeof Animated.ScrollView>>(null);
   const horizontalX=useRef(new Animated.Value(0)).current;
   const verticalY=useRef({home:new Animated.Value(0),tasks:new Animated.Value(0),alerts:new Animated.Value(0),settings:new Animated.Value(0)}).current;
@@ -36,6 +37,7 @@ export default function Home(){
     const interval=setInterval(()=>setNow(Date.now()),30000);
     return ()=>{sub.remove();clearInterval(interval);};
   },[refresh]));
+  const filteredTasks=taskCategoryFilter==='all'?tasks:tasks.filter(t=>t.category===taskCategoryFilter);
   const pending=tasks.filter(t=>!t.completed);
   const overdue=pending.filter(t=>t.due_at<now);
   const upcoming=pending.filter(t=>t.due_at>=now);
@@ -99,8 +101,9 @@ export default function Home(){
         <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
         {upcoming.length?upcoming.slice(0,8).map(card):empty('Nenhuma tarefa futura. Que paz suspeita.')}
       </>:<>
-        <View style={s.sectionHead}><Text style={s.section}>{page==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(page==='tasks'?tasks.length:overdue.length).padStart(2,'0')}</Text></View>
-        {page==='tasks'?(tasks.length?tasks.map(card):empty('Ainda não tem nada aqui. Crie sua primeira tarefa.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
+        <View style={s.sectionHead}><Text style={s.section}>{page==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(page==='tasks'?filteredTasks.length:overdue.length).padStart(2,'0')}</Text></View>
+        {page==='tasks'?<View style={{marginBottom:18}}><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8,paddingVertical:3}}>{([{key:'all',label:'Todas'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>setTaskCategoryFilter(item.key)} style={{paddingHorizontal:15,paddingVertical:11,borderRadius:999,borderWidth:1,borderColor:active?c.accent:c.border,backgroundColor:active?c.accentSoft:c.surface}}><Text style={{color:active?c.accent:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</ScrollView></View>:null}
+        {page==='tasks'?(filteredTasks.length?filteredTasks.map(card):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
       </>}
       <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>
       </>}
