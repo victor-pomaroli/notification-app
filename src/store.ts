@@ -23,6 +23,7 @@ const ready=(async()=>{
   return db;
 })();
 export async function initDB(){await ready;}
+async function refreshWidget(){try{const {Platform}=await import('react-native');if(Platform.OS==='android')await (await import('./widget/sync')).refreshPingWidget();}catch(e){console.warn('[widget] Refresh failed:',e);}}
 export async function listTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks ORDER BY completed ASC,due_at ASC');}
 export async function getTask(id:number){const db=await ready;return db.getFirstAsync<Task>('SELECT * FROM tasks WHERE id=?',id);}
 async function reminderIds(id:number){
@@ -59,6 +60,7 @@ export async function saveTask(task:TaskInput,id?:number){
   }
   const current=await getTask(taskId!);
   await replaceReminders(taskId!,task,!!current?.completed);
+  await refreshWidget();
   return taskId!;
 }
 export async function completeTask(id:number,completed:boolean){
@@ -66,12 +68,14 @@ export async function completeTask(id:number,completed:boolean){
   if(!task)return;
   await db.runAsync('UPDATE tasks SET completed=? WHERE id=?',completed?1:0,id);
   await replaceReminders(id,task,completed);
+  await refreshWidget();
 }
 export async function deleteTask(id:number){
   const db=await ready;
   await cancelTaskReminders(await reminderIds(id));
   await db.runAsync('DELETE FROM task_notifications WHERE task_id=?',id);
   await db.runAsync('DELETE FROM tasks WHERE id=?',id);
+  await refreshWidget();
 }
 export async function reconcileReminders(){
   const db=await ready;
