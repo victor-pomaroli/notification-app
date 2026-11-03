@@ -1,1 +1,40 @@
-{"expo":{"name":"Minhas Tarefas","slug":"minhas-tarefas","scheme":"minhastarefas","plugins":["expo-router","expo-sqlite",["expo-notifications",{"defaultChannel":"tasks"}]],"android":{"package":"com.example.minhastarefas"},"ios":{"bundleIdentifier":"com.example.minhastarefas"}}}
+{
+  "expo": {
+    "name": "Minhas Tarefas",
+    "slug": "minhas-tarefas",
+    "scheme": "minhastarefas",
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "tasks"
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "PingTasks",
+              "label": "Ping · 5 tarefas",
+              "description": "As cinco tarefas pendentes mais recentes",
+              "minWidth": "280dp",
+              "minHeight": "280dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 4,
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
+    ],
+    "android": {
+      "package": "com.example.minhastarefas"
+    },
+    "ios": {
+      "bundleIdentifier": "com.example.minhastarefas"
+    }
+  }
+}
