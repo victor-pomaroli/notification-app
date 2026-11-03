@@ -63,9 +63,10 @@ export async function saveTask(task:TaskInput,id?:number){
     taskId=result.lastInsertRowId;
   }
   const current=await getTask(taskId!);
-  await replaceReminders(taskId!,task,!!current?.completed);
+  let reminderError=false;
+  try{await replaceReminders(taskId!,task,!!current?.completed);}catch(e){reminderError=true;console.warn(e);}
   await refreshWidget();
-  return taskId!;
+  return {id:taskId!,reminderError};
 }
 export async function completeTask(id:number,completed:boolean){
   const db=await ready;const task=await getTask(id);
