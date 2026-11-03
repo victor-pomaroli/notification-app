@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import {Platform} from 'react-native';
+import {getPreferences} from './preferences';
 import {reminderMessage,reminderOffsets,TaskCategory,ReminderStage} from './templates';
 
 Notifications.setNotificationHandler({
@@ -23,6 +24,8 @@ function allowedTime(timestamp:number){
   return date.getTime();
 }
 export async function scheduleTaskReminders(task:ReminderTask):Promise<ScheduledReminder[]>{
+  const prefs=await getPreferences();
+  if(!prefs.notifications)return [];
   const permission=await Notifications.getPermissionsAsync();
   if(!permission.granted){console.warn('[notifications] Permission not granted');return [];}
   const result:ScheduledReminder[]=[];
@@ -35,8 +38,8 @@ export async function scheduleTaskReminders(task:ReminderTask):Promise<Scheduled
       used.add(at);
       const id=await Notifications.scheduleNotificationAsync({
         content:{
-          title:task.title,
-          body:reminderMessage(task.category,stage as ReminderStage,task.id+stage),
+          title:prefs.privatePreviews?'Ping · lembrete':task.title,
+          body:prefs.privatePreviews?'Você tem uma tarefa esperando. Abra o Ping para conferir.':reminderMessage(task.category,stage as ReminderStage,task.id+stage),
           data:{kind:'task_due',taskId:task.id,stage},
         },
         trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(at),
