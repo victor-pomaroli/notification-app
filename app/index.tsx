@@ -17,7 +17,7 @@ export default function Home(){
   const s=React.useMemo(()=>createStyles(c),[c]);
   const [tasks,setTasks]=useState<Task[]>([]);
   const [tab,setTab]=useState<Tab>('home');
-  const pager=useRef<ScrollView>(null);
+  const pager=useRef<React.ElementRef<typeof Animated.ScrollView>>(null);
   const horizontalX=useRef(new Animated.Value(0)).current;
   const verticalY=useRef({home:new Animated.Value(0),tasks:new Animated.Value(0),alerts:new Animated.Value(0),settings:new Animated.Value(0)}).current;
   const [pageWidth,setPageWidth]=useState(Dimensions.get('window').width);
@@ -55,11 +55,11 @@ export default function Home(){
   function card(t:Task){
     const late=!t.completed&&t.due_at<now;
     return <Pressable key={t.id} style={s.task} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
-      <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,t.completed&&s.checked]}>
+      <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,!!t.completed?s.checked:undefined]}>
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
       <View style={{flex:1,gap:7}}>
-        <Text style={[s.taskTitle,t.completed&&s.completed]}>{t.title}</Text>
+        <Text style={[s.taskTitle,!!t.completed?s.completed:undefined]}>{t.title}</Text>
         <Text style={s.meta}>{categories[t.category]??'Geral'}  /  {formatDate(t.due_at)}</Text>
       </View>
       <View style={s.priorityWrap}>
