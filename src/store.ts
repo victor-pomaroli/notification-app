@@ -28,7 +28,7 @@ const ready=(async()=>{
 export async function initDB(){await ready;}
 async function refreshWidget(){try{const {Platform}=await import('react-native');if(Platform.OS==='android')await (await import('./widget/sync')).refreshPingWidget();}catch(e){console.warn('[widget] Refresh failed:',e);}}
 export async function listTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks ORDER BY completed ASC,due_at ASC');}
-export async function listWidgetTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 ORDER BY id DESC LIMIT 5');}
+export async function listWidgetTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 ORDER BY due_at ASC,id ASC LIMIT 5');}
 export async function getTask(id:number){const db=await ready;return db.getFirstAsync<Task>('SELECT * FROM tasks WHERE id=?',id);}
 async function reminderIds(id:number){
   const db=await ready;
