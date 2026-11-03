@@ -17,3 +17,23 @@ export async function setPreference<K extends keyof Preferences>(key:K,value:Pre
   await conn.execAsync('CREATE TABLE IF NOT EXISTS app_preferences (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
   await conn.runAsync('INSERT OR REPLACE INTO app_preferences(key,value) VALUES(?,?)',key,String(value));
 }
+
+export async function needsOnboarding():Promise<boolean>{
+  const conn=await db;
+  await conn.execAsync('CREATE TABLE IF NOT EXISTS app_preferences (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
+  const rows=await conn.getAllAsync<{key:string;value:string}>("SELECT key,value FROM app_preferences WHERE key IN ('onboardingComplete','displayName','addressStyle','personality')");
+  const values=Object.fromEntries(rows.map(row=>[row.key,row.value]));
+  if(values.onboardingComplete==='true')return false;
+  // Existing installations with a configured profile should not be interrupted.
+  return !('displayName' in values||'addressStyle' in values||'personality' in values);
+}
+export async function completeOnboarding(name:string,addressStyle:AddressStyle,personality:NotificationPersonality):Promise<void>{
+  const conn=await db;
+  await conn.execAsync('CREATE TABLE IF NOT EXISTS app_preferences (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
+  await conn.withTransactionAsync(async()=>{
+    await conn.runAsync('INSERT OR REPLACE INTO app_preferences(key,value) VALUES(?,?)','displayName',name.trim().slice(0,32));
+    await conn.runAsync('INSERT OR REPLACE INTO app_preferences(key,value) VALUES(?,?)','addressStyle',addressStyle);
+    await conn.runAsync('INSERT OR REPLACE INTO app_preferences(key,value) VALUES(?,?)','personality',personality);
+    await conn.runAsync('INSERT OR REPLACE INTO app_preferences(key,value) VALUES(?,?)','onboardingComplete','true');
+  });
+}
