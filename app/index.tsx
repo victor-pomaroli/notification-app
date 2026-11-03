@@ -109,7 +109,7 @@ const s=StyleSheet.create({
   brandMarkText:{fontSize:21,fontWeight:'900',color:c.background},brandName:{color:c.text,fontSize:25,fontWeight:'900',letterSpacing:-1.5},
   brandCaption:{color:c.muted,fontSize:9,fontWeight:'800',letterSpacing:1.3,marginLeft:'auto'},
   eyebrow:{color:c.accent,fontSize:10,fontWeight:'900',letterSpacing:2.5,marginBottom:13},
-  heading:{color:c.text,fontSize:48,fontWeight:'900',lineHeight:51,letterSpacing:-2.5,marginBottom:29},
+  heading:{color:c.text,fontSize:40,fontWeight:'900',lineHeight:43,letterSpacing:-2,marginBottom:22},
   hero:{backgroundColor:c.accent,borderRadius:8,padding:23,marginBottom:33,transform:[{rotate:'-1deg'}]},
   heroLabel:{color:c.background,fontWeight:'900',letterSpacing:2,fontSize:10},
   heroNumbers:{flexDirection:'row',alignItems:'center',gap:20,marginTop:6},
