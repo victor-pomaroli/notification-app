@@ -3,7 +3,8 @@ import {Text,TextInput,Pressable,ScrollView,StyleSheet,Alert,Platform,View} from
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {useLocalSearchParams,useRouter} from 'expo-router';
 import {getTask,saveTask} from '../src/store';
-import {cancelTaskNotification,scheduleTask,testNotification} from '../src/notifications';
+import {categories,TaskCategory} from '../src/templates';
+import {testNotification} from '../src/notifications';
 import {theme as c} from '../src/theme';
 export default function Edit(){
   const {id}=useLocalSearchParams<{id?:string}>();
@@ -12,23 +13,17 @@ export default function Edit(){
   const [description,setDescription]=useState('');
   const [due,setDue]=useState(new Date(Date.now()+3600000));
   const [priority,setPriority]=useState<'low'|'medium'|'high'>('medium');
-  const [oldNotification,setOldNotification]=useState<string|null>(null);
+  const [category,setCategory]=useState<TaskCategory>('general');
   const [completed,setCompleted]=useState(false);
   const [picker,setPicker]=useState<'date'|'time'|null>(null);
   const [saving,setSaving]=useState(false);
-  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);setDescription(t.description);setDue(new Date(t.due_at));setPriority(t.priority);setOldNotification(t.notification_id);setCompleted(!!t.completed);}}).catch(console.warn);},[id]);
+  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);setDescription(t.description);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);}}).catch(console.warn);},[id]);
   async function save(){
     if(!title.trim())return Alert.alert('Informe um título');
     if(saving)return;
     setSaving(true);
     try{
-      const notificationId=completed?null:await scheduleTask(title.trim(),due.getTime());
-      if(!completed && due.getTime()>Date.now() && !notificationId){
-        Alert.alert('Notificação não agendada','Verifique a permissão de notificações do Expo Go nas configurações do Android. A tarefa será salva sem aviso.');
-      }
-      try{await saveTask({title:title.trim(),description,due_at:due.getTime(),priority},id?Number(id):undefined,notificationId);}
-      catch(e){await cancelTaskNotification(notificationId);throw e;}
-      await cancelTaskNotification(oldNotification);
+      await saveTask({title:title.trim(),description,due_at:due.getTime(),priority,category},id?Number(id):undefined);
       router.back();
     }catch(e){Alert.alert('Erro ao salvar',String(e));}
     finally{setSaving(false);}
@@ -48,7 +43,9 @@ export default function Edit(){
       if(value)setDue(prev=>{const next=new Date(prev);if(picker==='date')next.setFullYear(value.getFullYear(),value.getMonth(),value.getDate());else next.setHours(value.getHours(),value.getMinutes(),0,0);return next;});
       setPicker(null);
     }}/>}
-    <Text style={s.helper}>O aviso será enviado somente no horário do vencimento, se as notificações estiverem autorizadas.</Text>
+    <Text style={s.helper}>Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.</Text>
+    <Text style={s.label}>Categoria</Text>
+    <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=><Pressable key={key} style={[s.choice,{flexBasis:'29%'},category===key&&s.selected]} onPress={()=>setCategory(key)}><Text style={[s.choiceText,category===key&&s.selectedText]}>{categories[key]}</Text></Pressable>)}</View>
     <Text style={s.label}>Prioridade</Text>
     <View style={s.row}>{(['low','medium','high'] as const).map((p,i)=><Pressable key={p} style={[s.choice,priority===p&&s.selected]} onPress={()=>setPriority(p)}><Text style={[s.choiceText,priority===p&&s.selectedText]}>{['Baixa','Média','Alta'][i]}</Text></Pressable>)}</View>
     {completed?<Text style={s.helper}>Esta tarefa já está concluída. Não será agendada uma nova notificação.</Text>:null}
