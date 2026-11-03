@@ -2,7 +2,8 @@ import React,{useCallback,useState} from 'react';
 import {View,Text,ScrollView,Pressable,StyleSheet,Alert,AppState} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {Task,listTasks,completeTask,deleteTask} from '../src/store';
-import {cancelTaskNotification,scheduleTask} from '../src/notifications';
+import {categories} from '../src/templates';
+
 import {theme as c} from '../src/theme';
 type Tab='home'|'tasks'|'alerts';
 const priorityLabel={low:'Baixa',medium:'Média',high:'Alta'};
@@ -25,19 +26,13 @@ export default function Home(){
   const today=pending.filter(t=>new Date(t.due_at).toDateString()===new Date(now).toDateString());
   async function toggle(t:Task){
     try{
-      if(!t.completed){
-        await cancelTaskNotification(t.notification_id);
-        await completeTask(t.id,true,null);
-      }else{
-        const id=await scheduleTask(t.title,t.due_at);
-        await completeTask(t.id,false,id);
-      }
+      await completeTask(t.id,!t.completed);
       await refresh();
     }catch(e){Alert.alert('Erro ao atualizar',String(e));}
   }
   function remove(t:Task){
     Alert.alert('Excluir tarefa?',t.title,[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:async()=>{
-      try{await cancelTaskNotification(t.notification_id);await deleteTask(t.id);await refresh();}
+      try{await deleteTask(t.id);await refresh();}
       catch(e){Alert.alert('Erro ao excluir',String(e));}
     }}]);
   }
@@ -48,7 +43,7 @@ export default function Home(){
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
       <View style={{flex:1,gap:5}}><Text style={[s.taskTitle,t.completed&&s.completed]}>{t.title}</Text>
-        <Text style={s.muted}>{formatDate(t.due_at)} · {priorityLabel[t.priority]}</Text>
+        <Text style={s.muted}>{formatDate(t.due_at)} · {categories[t.category]??'Geral'} · {priorityLabel[t.priority]}</Text>
       </View>
       {late?<Text style={s.late}>Atrasada</Text>:null}
     </Pressable>;
