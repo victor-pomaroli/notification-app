@@ -3,7 +3,7 @@ import {FlexWidget,TextWidget} from 'react-native-android-widget';
 import type {Task} from '../store';
 import {categories} from '../templates';
 
-const palette={background:'#111310',surface:'#1C201A',text:'#F4F1E7',muted:'#A4AA9A',accent:'#D7FC65',danger:'#FF887B'};
+const palette={background:'#111310',surface:'#1C201A',text:'#F4F1E7',muted:'#A4AA9A',accent:'#D7FC65',danger:'#FF887B'} as const;
 export type WidgetTask=Pick<Task,'id'|'title'|'due_at'|'category'>;
 const time=(ms:number)=>new Date(ms).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 export function PingTasksWidget({tasks=[]}:{tasks?:WidgetTask[]}){
