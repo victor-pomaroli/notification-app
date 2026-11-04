@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,Pressable,ScrollView,StyleSheet,ActivityIndicator} from 'react-native';
+import {View,Text,Pressable,ActivityIndicator} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {CalendarDaySummary,CalendarEntry,listCalendarDay,listCalendarMonth,completeTask} from '../store';
 import {useAppTheme} from '../theme';
@@ -57,7 +57,7 @@ export function CalendarScreen({active}:{active:boolean}){
   if(entry.routine&&dayId!==key(new Date()))return;
   try{await completeTask(entry.task.id,!entry.completed);invalidate();}catch(e){setError(String(e));}
  }
- return <ScrollView contentContainerStyle={{paddingHorizontal:23,paddingTop:16,paddingBottom:140}}>
+ return <View style={{paddingHorizontal:0,paddingTop:0,paddingBottom:24}}> 
   <Text style={{color:c.accent,fontSize:10,fontWeight:'900',letterSpacing:2,marginBottom:12}}>PING / CALENDÁRIO</Text>
   <Text style={{color:c.text,fontSize:37,fontWeight:'900',lineHeight:43,marginBottom:24}}>Seu tempo.\nSeu ritmo.</Text>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
@@ -82,5 +82,5 @@ export function CalendarScreen({active}:{active:boolean}){
    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:entry.completed}} onPress={()=>toggle(entry)} style={{width:25,height:25,borderWidth:2,borderColor:c.accent,borderRadius:6,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.accent}}>{entry.completed?'✓':''}</Text></Pressable>
    <View style={{flex:1}}><Text style={{color:entry.completed?c.muted:c.text,fontSize:15,fontWeight:'700'}}>{entry.task.title}</Text><Text style={{color:c.muted,fontSize:11,marginTop:5}}>{new Date(entry.task.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}{entry.routine?' · ROTINA DIÁRIA':''}</Text></View>
   </Pressable>)}
- </ScrollView>;
+ </View>;
 }
