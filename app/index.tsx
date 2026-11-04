@@ -6,8 +6,9 @@ import {Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,delete
 import {categories,TaskCategory} from '../src/templates';
 import {useAppTheme,ThemeColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
+import {CalendarScreen} from '../src/components/CalendarScreen';
 
-type Tab='home'|'tasks'|'alerts';
+type Tab='home'|'tasks'|'calendar'|'alerts';
 const categoryColors:Record<'dark'|'softLight',Record<TaskCategory,{text:string;surface:string}>>={
   dark:{study:{text:'#A9B8FF',surface:'#29314A'},work:{text:'#7DDCC7',surface:'#203C35'},finance:{text:'#F7CE7A',surface:'#44371F'},home:{text:'#FFAD91',surface:'#493026'},health:{text:'#A5E8A3',surface:'#28422A'},general:{text:'#D7FC65',surface:'#354326'}},
   softLight:{study:{text:'#394E9A',surface:'#E1E7FF'},work:{text:'#176F5A',surface:'#D9F2E8'},finance:{text:'#896018',surface:'#FFF0C9'},home:{text:'#A34F35',surface:'#FBE5DC'},health:{text:'#39763D',surface:'#E0F2DD'},general:{text:'#536D23',surface:'#DFE8C7'}}
@@ -38,9 +39,9 @@ export default function Home(){
   const [visibleTaskCount,setVisibleTaskCount]=useState(50);
   const pager=useRef<React.ElementRef<typeof Animated.ScrollView>>(null);
   const horizontalX=useRef(new Animated.Value(0)).current;
-  const verticalY=useRef({home:new Animated.Value(0),tasks:new Animated.Value(0),alerts:new Animated.Value(0)}).current;
+  const verticalY=useRef({home:new Animated.Value(0),tasks:new Animated.Value(0),calendar:new Animated.Value(0),alerts:new Animated.Value(0)}).current;
   const [pageWidth,setPageWidth]=useState(Dimensions.get('window').width);
-  const tabs:Tab[]=['home','tasks','alerts'];
+  const tabs:Tab[]=['home','tasks','calendar','alerts'];
   const goToTab=(next:Tab)=>{setTab(next);pager.current?.scrollTo({x:tabs.indexOf(next)*pageWidth,animated:true});};
   const [now,setNow]=useState(Date.now());
   const [deleteTarget,setDeleteTarget]=useState<Task|null>(null);
@@ -114,7 +115,7 @@ export default function Home(){
       <>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
       <Text style={s.heading}>{page==='home'?'Seu dia.\nSem desculpas.':page==='tasks'?'Tudo na\nmesma lista.':'Olha o que\nficou pra trás.'}</Text>
-      {page==='home'?<>
+      {page==='calendar'?<CalendarScreen active={tab==='calendar'}/>:page==='home'?<>
         <View style={s.hero}>
           <View pointerEvents="none" style={s.postitCornerCut}/>
           <View pointerEvents="none" style={s.postitFold}/>
@@ -155,8 +156,8 @@ export default function Home(){
       </View>)}
     </Animated.ScrollView>
     {<Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>}
-    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
-      <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS'][i]}</Text>
+    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','calendar','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
+      <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','CALENDÁRIO','ATRASOS'][i]}</Text>
       {tab===key?<View style={s.dot}/>:null}
     </Pressable>)}</View>
   </View>;
@@ -193,6 +194,6 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   add:{position:'absolute',bottom:91,right:23,backgroundColor:c.accent,height:61,width:61,borderRadius:12,alignItems:'center',justifyContent:'center',elevation:7},
   plus:{color:c.background,fontSize:38,fontWeight:'500',lineHeight:47},
   nav:{height:75,backgroundColor:c.surface,flexDirection:'row',borderTopWidth:1,borderTopColor:c.border,paddingHorizontal:12},
-  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navSelected:{},navText:{color:c.muted,fontSize:10,fontWeight:'900',letterSpacing:1.4},
+  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navSelected:{},navText:{color:c.muted,fontSize:9,fontWeight:'900',letterSpacing:0.7},
   navActive:{color:c.accent},dot:{width:16,height:3,borderRadius:3,backgroundColor:c.accent},
 });
