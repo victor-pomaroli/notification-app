@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import {getPreferences} from './preferences';
 import {reminderOffsets} from './templates';
 import {TaskCategory} from './templates';
-import {cancelTaskReminders,scheduleTaskReminders,ScheduledReminder} from './notifications';
+import {SNOOZE_STAGE,cancelTaskReminders,scheduleTaskReminders,scheduleSnoozeReminder,dismissTaskNotifications,dismissAllTaskNotifications,ScheduledReminder} from './notifications';
 export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;completed_at:number|null;archived_at:number|null;notification_id:string|null};
 export type TaskInput=Pick<Task,'title'|'description'|'due_at'|'priority'|'category'>;
 const dbPromise=SQLite.openDatabaseAsync('tasks.db');
@@ -84,11 +84,25 @@ export async function completeTask(id:number,completed:boolean){
   if(!task)return;
   await db.runAsync('UPDATE tasks SET completed=?,completed_at=?,archived_at=NULL WHERE id=?',completed?1:0,completed?Date.now():null,id);
   await replaceReminders(id,task,completed);
+  if(completed)await dismissTaskNotifications(id);
   await refreshWidget();
+}
+/** Botão "Adiar": tira o aviso da bandeja e agenda um novo daqui a alguns minutos. */
+export async function snoozeTask(id:number){
+  const db=await ready;const task=await getTask(id);
+  if(!task||task.completed)return;
+  await dismissTaskNotifications(id);
+  // Substitui um adiamento anterior em vez de acumular vários.
+  const previous=await db.getAllAsync<{notification_id:string}>('SELECT notification_id FROM task_notifications WHERE task_id=? AND stage=?',id,SNOOZE_STAGE);
+  await cancelTaskReminders(previous.map(r=>r.notification_id));
+  await db.runAsync('DELETE FROM task_notifications WHERE task_id=? AND stage=?',id,SNOOZE_STAGE);
+  const snoozed=await scheduleSnoozeReminder(task);
+  if(snoozed)await db.runAsync('INSERT INTO task_notifications(notification_id,task_id,stage,scheduled_at) VALUES(?,?,?,?)',snoozed.notification_id,id,snoozed.stage,snoozed.scheduled_at);
 }
 export async function deleteTask(id:number){
   const db=await ready;
   await cancelTaskReminders(await reminderIds(id));
+  await dismissTaskNotifications(id);
   await db.runAsync('DELETE FROM task_notifications WHERE task_id=?',id);
   await db.runAsync('DELETE FROM tasks WHERE id=?',id);
   await refreshWidget();
@@ -113,11 +127,6 @@ export async function reconcileReminders(){
   const now=Date.now();
   for(const task of tasks){
     const rows=byTask.get(task.id)??[];
-    const ids=rows.map(r=>r.notification_id);
-    if(task.completed){
-      if(ids.length)await replaceReminders(task.id,task,true);
-      continue;
-    }
     // Rebuild only future occurrences when an expected scheduled ID disappeared.
     const hasFutureStage=reminderOffsets(task.category).some(minutes=>task.due_at+minutes*60000>now);
     if(rows.some(r=>r.scheduled_at>now&&!available.has(r.notification_id)) ||
@@ -138,5 +147,6 @@ export async function deleteAllTasks(){
   await cancelTaskReminders(rows.map(row=>row.notification_id));
   await db.runAsync('DELETE FROM task_notifications');
   await db.runAsync('DELETE FROM tasks');
+  await dismissAllTaskNotifications();
   await refreshWidget();
 }
