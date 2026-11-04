@@ -21,13 +21,14 @@
           "widgets": [
             {
               "name": "PingTasks",
-              "label": "Ping · 5 tarefas",
-              "description": "As cinco tarefas pendentes mais recentes",
-              "minWidth": "280dp",
-              "minHeight": "280dp",
+              "label": "Ping · próximas tarefas",
+              "description": "Suas próximas tarefas pendentes",
+              "minWidth": "250dp",
+              "minHeight": "180dp",
               "targetCellWidth": 4,
               "targetCellHeight": 4,
-              "updatePeriodMillis": 1800000
+              "updatePeriodMillis": 1800000,
+              "resizeMode": "horizontal|vertical"
             }
           ]
         }
