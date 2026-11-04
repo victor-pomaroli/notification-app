@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {Text,TextInput,Pressable,ScrollView,StyleSheet,View,Modal,Alert} from 'react-native';
 import {useLocalSearchParams,useRouter} from 'expo-router';
-import {getTask,saveTaskGroup,listChildren} from '../src/store';
+import {getTask,saveTaskGroup,listChildren,ChildInput} from '../src/store';
 import * as Notifications from 'expo-notifications';
 import {getPreferences} from '../src/preferences';
 import {categories,TaskCategory} from '../src/templates';
@@ -13,7 +13,7 @@ export default function Edit(){
   const {id}=useLocalSearchParams<{id?:string}>();
   const router=useRouter();
   const [title,setTitle]=useState('');
-  const [children,setChildren]=useState<string[]>([]);
+  const [children,setChildren]=useState<ChildInput[]>([]);
   const [due,setDue]=useState(new Date(Date.now()+3600000));
   const [priority,setPriority]=useState<'low'|'medium'|'high'>('medium');
   const [category,setCategory]=useState<TaskCategory>('general');
@@ -39,7 +39,7 @@ export default function Edit(){
   }
   const [saving,setSaving]=useState(false);
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
-  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>row.title))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);setDaily(!!t.daily);}}).catch(console.warn);},[id]);
+  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>({id:row.id,title:row.title})))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);setDaily(!!t.daily);}}).catch(console.warn);},[id]);
   async function save(){
     if(!title.trim()){setFeedback({title:'Faltou o principal.',message:'Dá um nome para essa tarefa antes de continuar.'});return;}
     if(saving)return;
@@ -64,12 +64,12 @@ export default function Edit(){
     <TextInput style={s.input} placeholderTextColor={c.muted} value={title} onChangeText={setTitle} placeholder="Ex.: Entregar relatório" maxLength={120}/>
     <Text style={s.label}>02 / TAREFAS ASSOCIADAS</Text>
     <View style={{borderLeftWidth:2,borderLeftColor:c.accent,marginLeft:12,paddingLeft:16,gap:10}}>
-      {children.map((value,index)=><View key={index} style={{flexDirection:'row',alignItems:'center',gap:8}}>
+      {children.map((value,index)=><View key={value.id??`new-${index}`} style={{flexDirection:'row',alignItems:'center',gap:8}}>
         <Text style={{color:c.accent,fontSize:20}}>↳</Text>
-        <TextInput style={[s.input,{flex:1}]} placeholderTextColor={c.muted} placeholder={`Etapa ${index+1}`} value={value} onChangeText={text=>setChildren(old=>old.map((item,i)=>i===index?text:item))} maxLength={120}/>
+        <TextInput style={[s.input,{flex:1}]} placeholderTextColor={c.muted} placeholder={`Etapa ${index+1}`} value={value.title} onChangeText={text=>setChildren(old=>old.map((item,i)=>i===index?{...item,title:text}:item))} maxLength={120}/>
         <Pressable accessibilityLabel="Remover tarefa associada" onPress={()=>setChildren(old=>old.filter((_,i)=>i!==index))} style={{padding:9}}><Text style={{color:c.danger,fontSize:20}}>×</Text></Pressable>
       </View>)}
-      <Pressable accessibilityRole="button" onPress={()=>setChildren(old=>[...old,''])} style={{borderWidth:1,borderStyle:'dashed',borderColor:c.accent,borderRadius:9,padding:15,flexDirection:'row',alignItems:'center',gap:10,backgroundColor:c.accentSoft}}>
+      <Pressable accessibilityRole="button" onPress={()=>setChildren(old=>[...old,{title:''}])} style={{borderWidth:1,borderStyle:'dashed',borderColor:c.accent,borderRadius:9,padding:15,flexDirection:'row',alignItems:'center',gap:10,backgroundColor:c.accentSoft}}>
         <Text style={{color:c.accent,fontSize:24,fontWeight:'900'}}>+</Text>
         <Text style={{color:c.accent,fontSize:12,fontWeight:'900'}}>ADICIONAR TAREFA À MISSÃO</Text>
       </Pressable>

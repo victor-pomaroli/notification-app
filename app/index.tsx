@@ -55,10 +55,10 @@ export default function Home(){
     const interval=setInterval(()=>setNow(Date.now()),30000);
     return ()=>{sub.remove();clearInterval(interval);};
   },[refresh]));
-  const filteredTasks=taskCategoryFilter==='all'?tasks:tasks.filter(t=>t.category===taskCategoryFilter);
+  const filteredTasks=tasks.filter(t=>!t.parent_id&&(taskCategoryFilter==='all'||t.category===taskCategoryFilter));
   const [filteredPage,setFilteredPage]=useState<Task[]>([]);
   React.useEffect(()=>{let active=true;listTaskPage(50,0,taskCategoryFilter==='all'?undefined:taskCategoryFilter).then(rows=>{if(active){setFilteredPage(rows);setVisibleTaskCount(50);}}).catch(console.warn);return()=>{active=false;};},[taskCategoryFilter,tasks]);
-  async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.length,taskCategoryFilter==='all'?undefined:taskCategoryFilter);setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
+  async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.filter(t=>!t.parent_id).length,taskCategoryFilter==='all'?undefined:taskCategoryFilter);setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.filter(t=>!t.parent_id).length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
   const roots=tasks.filter(t=>!t.parent_id);
   const pending=roots.filter(t=>!t.completed);
   const overdue=pending.filter(t=>!t.daily&&t.due_at<now);
@@ -76,7 +76,7 @@ export default function Home(){
     catch(e){setDeleteTarget(null);setFeedback({title:'Não foi possível excluir.',message:String(e)});}
     finally{setBusyDelete(false);}
   }
-  function groupedCards(items:Task[]){return items.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...tasks.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
+  function groupedCards(items:Task[]){const children=items.filter(t=>t.parent_id);return items.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...children.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
   function card(t:Task){
     const late=!t.completed&&!t.daily&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
@@ -123,9 +123,9 @@ export default function Home(){
           <Text style={s.heroFooter}>{pending.length===0?'Tudo resolvido. Aproveita esse raro momento.':overdue.length?'Tem coisa te esperando. Você sabe o que fazer.':'Por enquanto, tudo sob controle.'}</Text>
         </View>
         <View style={s.sectionHead}><Text style={s.section}>PASSOU DA HORA</Text><Text style={s.sectionCount}>{String(overdue.length).padStart(2,'0')}</Text></View>
-        {overdue.length?groupedCards(overdue):empty('Nada atrasado. Pode comemorar sem exagerar.')}
+        {overdue.length?groupedCards(tasks.filter(t=>overdue.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada atrasado. Pode comemorar sem exagerar.')}
         <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
-        {upcoming.length?groupedCards(upcoming.slice(0,8)):empty('Nenhuma tarefa futura. Que paz suspeita.')}
+        {upcoming.length?groupedCards(tasks.filter(t=>upcoming.slice(0,8).some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nenhuma tarefa futura. Que paz suspeita.')}
       </>:<>
         <View style={s.sectionHead}><Text style={s.section}>{page==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(page==='tasks'?filteredTasks.length:overdue.length).padStart(2,'0')}</Text></View>
         {page==='tasks'?<Pressable accessibilityRole="button" onPress={()=>router.push('/routines')} style={{alignSelf:'flex-start',borderWidth:1,borderColor:c.accent,borderRadius:9,paddingHorizontal:15,paddingVertical:12,marginBottom:16,backgroundColor:c.accentSoft}}><Text style={{color:c.accent,fontWeight:'900',fontSize:12}}>↻ MINHAS ROTINAS</Text></Pressable>:null}
