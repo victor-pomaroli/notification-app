@@ -10,11 +10,12 @@ import {PingDialog} from '../src/components/PingDialog';
 export default function Edit(){
   const {colors:c}=useAppTheme();
   const s=React.useMemo(()=>createStyles(c),[c]);
-  const {id}=useLocalSearchParams<{id?:string}>();
+  const {id,date}=useLocalSearchParams<{id?:string;date?:string}>();
   const router=useRouter();
   const [title,setTitle]=useState('');
   const [children,setChildren]=useState<ChildInput[]>([]);
   const [due,setDue]=useState(new Date(Date.now()+3600000));
+  useEffect(()=>{if(id||!date||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date))return;const [year,month,day]=date.split('-').map(Number);setDue(old=>{const next=new Date(year,month-1,day,old.getHours(),old.getMinutes());return next.getFullYear()===year&&next.getMonth()===month-1&&next.getDate()===day?next:old;});},[date,id]);
   const [priority,setPriority]=useState<'low'|'medium'|'high'>('medium');
   const [category,setCategory]=useState<TaskCategory>('general');
   const [completed,setCompleted]=useState(false);
