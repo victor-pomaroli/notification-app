@@ -55,7 +55,7 @@ async function replaceReminders(id:number,task:TaskInput,completed:boolean){
   await cancelTaskReminders(old);
   await db.runAsync('DELETE FROM task_notifications WHERE task_id=?',id);
   await db.runAsync('UPDATE tasks SET notification_id=NULL WHERE id=?',id);
-  if(completed)return;
+  if(completed || (await getTask(id))?.parent_id)return;
   const scheduled=await scheduleTaskReminders({id,title:task.title,due_at:task.due_at,category:task.category});
   try{
     for(const item of scheduled)await db.runAsync(
