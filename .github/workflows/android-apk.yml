@@ -1,6 +1,9 @@
 name: Build Android APK
 
 on:
+  push:
+    branches:
+      - fix/android-apk-ci
   workflow_dispatch:
   pull_request:
     paths:
@@ -38,7 +41,7 @@ jobs:
         run: |
           # The current APK crashes before React Native starts while Room/WorkManager
           # tries to instantiate WorkDatabase.canonicalName. Test without R8 shrinking.
-          printf '\\nandroid.enableProguardInReleaseBuilds=false\\nandroid.enableMinifyInReleaseBuilds=false\\n' >> gradle.properties
+          printf '%s\n' 'android.enableProguardInReleaseBuilds=false' 'android.enableMinifyInReleaseBuilds=false' >> gradle.properties
           grep -nE 'minifyEnabled|enableProguardInReleaseBuilds|enableMinifyInReleaseBuilds' app/build.gradle gradle.properties
       - name: Build arm64 release APK
         working-directory: android
