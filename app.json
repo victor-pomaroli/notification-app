@@ -37,8 +37,8 @@
     "android": {
       "package": "com.example.ping",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#0A0A09"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0C0B"
       },
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
