@@ -29,7 +29,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - name: Install dependencies from lockfile
         run: npm ci
       - name: Generate Android project with Expo
