@@ -33,6 +33,13 @@ jobs:
         run: npm ci
       - name: Generate Android project with Expo
         run: npx expo prebuild --platform android --non-interactive --clean
+      - name: Disable R8 shrinking for WorkManager startup diagnosis
+        working-directory: android
+        run: |
+          # The current APK crashes before React Native starts while Room/WorkManager
+          # tries to instantiate WorkDatabase.canonicalName. Test without R8 shrinking.
+          printf '\\nandroid.enableProguardInReleaseBuilds=false\\nandroid.enableMinifyInReleaseBuilds=false\\n' >> gradle.properties
+          grep -nE 'minifyEnabled|enableProguardInReleaseBuilds|enableMinifyInReleaseBuilds' app/build.gradle gradle.properties
       - name: Build arm64 release APK
         working-directory: android
         run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --stacktrace
