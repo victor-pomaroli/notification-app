@@ -13,12 +13,12 @@ const WEEK=['D','S','T','Q','Q','S','S'];
  * Calendário mensal leve: um resumo por dia (bolinha) e a lista do dia escolhido.
  * O cabeçalho da aba fica com a tela principal; aqui é só o mês e o dia.
  * `refreshKey` muda sempre que a lista de tarefas do app recarrega, o que limpa os caches.
+ * O dia escolhido mora na tela principal, para o botão + criar a tarefa nesse dia.
  */
-export function CalendarScreen({active,refreshKey}:{active:boolean;refreshKey?:unknown}){
+export function CalendarScreen({active,refreshKey,selected,onSelect}:{active:boolean;refreshKey?:unknown;selected:Date;onSelect:(day:Date)=>void}){
   const {colors:c}=useAppTheme();
   const s=useMemo(()=>createStyles(c),[c]);
   const router=useRouter();
-  const [selected,setSelected]=useState(()=>new Date());
   const [revision,setRevision]=useState(0);
   const [summaries,setSummaries]=useState<CalendarDaySummary[]>([]);
   const [entries,setEntries]=useState<CalendarEntry[]>([]);
@@ -64,7 +64,7 @@ export function CalendarScreen({active,refreshKey}:{active:boolean;refreshKey?:u
     return()=>{alive=false;};
   },[active,dayId,revision]);
 
-  const changeMonth=(step:number)=>setSelected(d=>new Date(d.getFullYear(),d.getMonth()+step,1));
+  const changeMonth=(step:number)=>onSelect(new Date(selected.getFullYear(),selected.getMonth()+step,1));
   const first=monthStart.getDay(),count=new Date(selected.getFullYear(),selected.getMonth()+1,0).getDate();
   const cells=Array.from({length:Math.ceil((first+count)/7)*7},(_,i)=>i-first+1);
   const summary=new Map(summaries.map(x=>[x.day,x]));
@@ -93,7 +93,7 @@ export function CalendarScreen({active,refreshKey}:{active:boolean;refreshKey?:u
         const date=new Date(selected.getFullYear(),selected.getMonth(),d);const k=key(date);
         const isSelected=k===dayId,isToday=k===todayId;
         const day=summary.get(k);const total=day?.total??0;const allDone=total>0&&day!.completed===total;
-        return <Pressable key={i} accessibilityRole="button" accessibilityState={{selected:isSelected}} accessibilityLabel={`${d} de ${monthStart.toLocaleDateString('pt-BR',{month:'long'})}, ${total} tarefa${total===1?'':'s'}`} onPress={()=>setSelected(date)} style={[s.cell,isSelected&&s.cellSelected,!isSelected&&isToday&&s.cellToday]}>
+        return <Pressable key={i} accessibilityRole="button" accessibilityState={{selected:isSelected}} accessibilityLabel={`${d} de ${monthStart.toLocaleDateString('pt-BR',{month:'long'})}, ${total} tarefa${total===1?'':'s'}`} onPress={()=>onSelect(date)} style={[s.cell,isSelected&&s.cellSelected,!isSelected&&isToday&&s.cellToday]}>
           <Text style={[s.dayText,(isSelected||isToday)&&s.dayStrong,isSelected&&{color:c.background}]}>{d}</Text>
           <View style={[s.dot,total===0&&{opacity:0},{backgroundColor:isSelected?c.background:allDone?c.muted:c.accent}]}/>
         </Pressable>;
@@ -105,13 +105,12 @@ export function CalendarScreen({active,refreshKey}:{active:boolean;refreshKey?:u
         <Text style={s.dayTitle}>{dayId===todayId?'Hoje, ':''}{selected.toLocaleDateString('pt-BR',{weekday:dayId===todayId?undefined:'long',day:'numeric',month:'long'})}</Text>
         <Text style={s.dayMeta}>{entries.length===0?'Nada marcado':`${entries.length} tarefa${entries.length===1?'':'s'} · ${pendingCount} pendente${pendingCount===1?'':'s'}`}</Text>
       </View>
-      {dayId!==todayId?<Pressable accessibilityRole="button" hitSlop={8} onPress={()=>setSelected(new Date())} style={s.todayChip}><Text style={s.todayChipText}>HOJE</Text></Pressable>:null}
-      <Pressable accessibilityRole="button" accessibilityLabel="Nova tarefa neste dia" onPress={()=>router.push({pathname:'/edit',params:{date:dayId}})} style={s.newBtn}><Text style={s.newText}>+ NOVA</Text></Pressable>
+      {dayId!==todayId?<Pressable accessibilityRole="button" hitSlop={8} onPress={()=>onSelect(new Date())} style={s.todayChip}><Text style={s.todayChipText}>HOJE</Text></Pressable>:null}
     </View>
 
     {error?<Text style={s.error}>{error}</Text>:null}
     {loading&&!entries.length?<ActivityIndicator color={c.accent} style={{marginTop:18}}/>
-    :entries.length===0?<Text style={s.empty}>Dia livre. Toque em + NOVA para colocar algo aqui.</Text>
+    :entries.length===0?<Text style={s.empty}>Dia livre. Toque no + para colocar algo neste dia.</Text>
     :entries.map(entry=>{
       const locked=entry.routine&&dayId!==todayId;
       const t=entry.task;
@@ -150,8 +149,6 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   dayMeta:{color:c.muted,fontSize:12,marginTop:4},
   todayChip:{borderWidth:1,borderColor:c.border,borderRadius:999,paddingHorizontal:11,paddingVertical:8},
   todayChipText:{color:c.accent,fontSize:11,fontWeight:'900',letterSpacing:0.8},
-  newBtn:{backgroundColor:c.accent,paddingVertical:10,paddingHorizontal:13,borderRadius:9},
-  newText:{color:c.background,fontWeight:'900',fontSize:12,letterSpacing:0.6},
   error:{color:c.danger,marginVertical:10},
   empty:{color:c.muted,paddingVertical:20,fontSize:14},
   row:{flexDirection:'row',alignItems:'center',gap:13,paddingVertical:14,borderBottomWidth:1,borderBottomColor:c.border},
