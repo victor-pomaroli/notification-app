@@ -3,6 +3,10 @@ export const categories = {
   home: 'Casa', health: 'Saúde', general: 'Geral',
 } as const;
 export type TaskCategory = keyof typeof categories;
+/** Um emoji por assunto, todos objetos do mesmo estilo para ficarem alinhados. */
+export const categoryEmoji: Record<TaskCategory, string> = {
+  study: '🎓', work: '💼', finance: '💰', home: '🏡', health: '🩺', general: '📌',
+};
 export type ReminderStage = 0 | 1 | 2 | 3;
 import type {AddressStyle,NotificationPersonality} from './preferences';
 const templates:Record<TaskCategory,Record<ReminderStage,readonly string[]>>={

@@ -4,11 +4,11 @@ import {useLocalSearchParams,useRouter} from 'expo-router';
 import {getTask,saveTaskGroup,listChildren,ChildInput} from '../src/store';
 import * as Notifications from 'expo-notifications';
 import {getPreferences} from '../src/preferences';
-import {categories,TaskCategory} from '../src/templates';
-import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
+import {categories,categoryEmoji,TaskCategory} from '../src/templates';
+import {useAppTheme,ThemeColors,priorityColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 export default function Edit(){
-  const {colors:c,appearance}=useAppTheme();
+  const {colors:c}=useAppTheme();
   const s=React.useMemo(()=>createStyles(c),[c]);
   const {id}=useLocalSearchParams<{id?:string}>();
   const router=useRouter();
@@ -21,6 +21,8 @@ export default function Edit(){
   const [daily,setDaily]=useState(false);
   // "Quando?" é opcional: sem data a tarefa não agenda notificações.
   const [hasDue,setHasDue]=useState(true);
+  // Subtarefa não pode ter subtarefas nem virar rotina: só um nível de associação.
+  const [isChild,setIsChild]=useState(false);
   const [picker,setPicker]=useState<'date'|'time'|null>(null);
   const [month,setMonth]=useState(new Date());
   const [hour,setHour]=useState('00');
@@ -41,13 +43,13 @@ export default function Edit(){
   }
   const [saving,setSaving]=useState(false);
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
-  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>({id:row.id,title:row.title})))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);setDaily(!!t.daily);setHasDue(!t.no_due);}}).catch(console.warn);},[id]);
+  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>({id:row.id,title:row.title})))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);setDaily(!!t.daily);setHasDue(!t.no_due);setIsChild(!!t.parent_id);}}).catch(console.warn);},[id]);
   async function save(){
     if(!title.trim()){setFeedback({title:'Faltou o principal.',message:'Dá um nome para essa tarefa antes de continuar.'});return;}
     if(saving)return;
     setSaving(true);
     try{
-      const result=await saveTaskGroup({title:title.trim(),description:'',due_at:hasDue?due.getTime():Date.now(),priority,category,no_due:hasDue?0:1},children,id?Number(id):undefined,daily);
+      const result=await saveTaskGroup({title:title.trim(),description:'',due_at:hasDue?due.getTime():Date.now(),priority,category,no_due:hasDue?0:1},isChild?[]:children,id?Number(id):undefined,isChild?false:daily);
       const prefs=await getPreferences().catch(()=>null);
       const permission=prefs?.notifications&&hasDue?await Notifications.getPermissionsAsync().catch(()=>null):null;
       router.back();
@@ -64,6 +66,7 @@ export default function Edit(){
     <Text style={s.subtitle}>Anota agora. A gente te cobra depois.</Text>
     <Text style={s.label}>01 / O QUE PRECISA SER FEITO?</Text>
     <TextInput style={s.input} placeholderTextColor={c.muted} value={title} onChangeText={setTitle} placeholder="Ex.: Entregar relatório" maxLength={120}/>
+    {isChild?<Text style={s.helper}>Esta é uma tarefa associada. Ela segue a tarefa principal e não pode ter outras tarefas associadas.</Text>:<>
     <Text style={s.label}>02 / TAREFAS ASSOCIADAS</Text>
     <View style={{borderLeftWidth:2,borderLeftColor:c.accent,marginLeft:12,paddingLeft:16,gap:10}}>
       {children.map((value,index)=><View key={value.id??`new-${index}`} style={{flexDirection:'row',alignItems:'center',gap:8}}>
@@ -77,13 +80,14 @@ export default function Edit(){
       </Pressable>
     </View>
     <Text style={s.helper}>A primeira tarefa é a principal. Concluí-la também conclui todas as etapas associadas.</Text>
-    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:daily}} onPress={()=>setDaily(value=>{if(!value)setHasDue(true);return !value;})} style={{flexDirection:'row',alignItems:'center',gap:13,backgroundColor:c.surface,borderColor:daily?c.accent:c.border,borderWidth:1,borderRadius:10,padding:16,marginTop:22}}>
+    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:daily}} onPress={()=>setDaily(value=>!value)} style={{flexDirection:'row',alignItems:'center',gap:13,backgroundColor:c.surface,borderColor:daily?c.accent:c.border,borderWidth:1,borderRadius:10,padding:16,marginTop:22}}>
       <View style={{width:24,height:24,borderWidth:2,borderRadius:6,borderColor:daily?c.accent:c.muted,backgroundColor:daily?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}><Text style={{color:c.background,fontWeight:'900'}}>{daily?'✓':''}</Text></View>
-      <View style={{flex:1}}><Text style={{color:c.text,fontSize:15,fontWeight:'800'}}>Tarefa diária ↻</Text><Text style={{color:c.muted,fontSize:12,marginTop:3}}>Repetir todos os dias no mesmo horário</Text></View>
+      <View style={{flex:1}}><Text style={{color:c.text,fontSize:15,fontWeight:'800'}}>Tarefa diária ↻</Text><Text style={{color:c.muted,fontSize:12,marginTop:3}}>Repetir todos os dias, com ou sem horário</Text></View>
     </Pressable>
+    </>}
     <Text style={s.label}>03 / QUANDO? <Text style={s.labelOptional}>(OPCIONAL)</Text></Text>
     <View style={[s.row,{marginBottom:12}]}>{([{value:true,label:'Com data'},{value:false,label:'Sem data'}] as const).map(item=>{
-      const active=hasDue===item.value,blocked=!item.value&&daily;
+      const active=hasDue===item.value,blocked=false;
       return <Pressable key={item.label} accessibilityRole="radio" accessibilityState={{selected:active,disabled:blocked}} disabled={blocked} onPress={()=>setHasDue(item.value)} style={[s.choice,active&&s.selected,blocked&&{opacity:0.4}]}>
         <Text style={[s.choiceText,active&&s.selectedText]}>{item.label}</Text>
       </Pressable>;
@@ -133,9 +137,9 @@ export default function Edit(){
         <Pressable style={s.modalCancel} onPress={()=>setPicker(null)}><Text style={s.choiceText}>CANCELAR</Text></Pressable>
       </View></View>
     </Modal>
-    <Text style={s.helper}>{!hasDue?'Sem data, sem notificação. A tarefa fica na sua lista até você concluir.':daily?'Uma notificação por dia, no horário escolhido. Silêncio entre 22h e 7h.':'Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.'}</Text>
+    <Text style={s.helper}>{!hasDue?(daily?'Sem horário, sem notificação. A rotina aparece todo dia na sua lista.':'Sem data, sem notificação. A tarefa fica na sua lista até você concluir.'):daily?'Uma notificação por dia, no horário escolhido. Silêncio entre 22h e 7h.':'Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.'}</Text>
     <Text style={s.label}>04 / QUAL O ASSUNTO?</Text>
-    <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=>{const topic=categoryColors[appearance][key];const active=category===key;return <Pressable key={key} accessibilityRole="radio" accessibilityState={{selected:active}} style={[s.choice,{flexBasis:'29%'},active&&{backgroundColor:topic.surface,borderColor:topic.text}]} onPress={()=>setCategory(key)}><Text style={[s.choiceText,{color:topic.text},active&&{fontWeight:'900'}]}>{categories[key]}</Text></Pressable>;})}</View>
+    <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=>{const active=category===key;return <Pressable key={key} accessibilityRole="radio" accessibilityLabel={categories[key]} accessibilityState={{selected:active}} style={[s.choice,s.topic,active&&s.selected]} onPress={()=>setCategory(key)}><Text style={s.topicEmoji}>{categoryEmoji[key]}</Text><Text style={[s.choiceText,active&&s.selectedText]}>{categories[key]}</Text></Pressable>;})}</View>
     <Text style={s.label}>05 / QUAL A URGÊNCIA?</Text>
     <View style={s.row}>{(['low','medium','high'] as const).map((p,i)=>{
       const color=priorityColors[p];
@@ -159,6 +163,8 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   row:{flexDirection:'row',gap:8},
   choice:{backgroundColor:c.surface,paddingVertical:15,paddingHorizontal:10,borderRadius:7,flex:1,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:c.border},
   choiceText:{color:c.text,fontWeight:'700',fontSize:12},
+  topic:{flexBasis:'29%',paddingVertical:13,gap:6},
+  topicEmoji:{fontSize:22,lineHeight:28,textAlign:'center'},
   urgencyLine:{height:5,borderRadius:3,marginTop:9},
   selected:{backgroundColor:c.accentSoft,borderColor:c.accent},selectedText:{color:c.accent},
   helper:{color:c.muted,fontSize:12,marginTop:12,lineHeight:19},

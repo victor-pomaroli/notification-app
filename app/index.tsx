@@ -79,6 +79,7 @@ export default function Home(){
   }
   function groupedCards(items:Task[]){const children=items.filter(t=>t.parent_id);return items.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...children.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
   function card(t:Task){
+    if(t.parent_id)return subCard(t);
     const late=!t.completed&&!t.daily&&!t.no_due&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
     return <Pressable key={t.id} style={[s.task,t.parent_id?{marginLeft:28,paddingLeft:12,borderLeftWidth:2,borderLeftColor:c.accentSoft,backgroundColor:c.surface}:undefined,late?{borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
@@ -90,11 +91,25 @@ export default function Home(){
       <View style={{flex:1,gap:7}}>
         <TaskTitle key={`${t.id}-${t.completed}`} title={t.title} completed={!!t.completed} colors={c} style={late?{color:appearance==='dark'?'#FFB5A9':'#A82F27',fontWeight:'900'}:undefined}/>
         {t.description?.trim()?<Text style={s.taskDescription} numberOfLines={2}>{t.description.trim()}</Text>:null}
-        <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{t.daily?'↻ DIÁRIA · '+new Date(t.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):t.no_due?'Sem data':formatDate(t.due_at)}</Text></View>
+        <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{t.daily?(t.no_due?'↻ DIÁRIA':'↻ DIÁRIA · '+new Date(t.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})):t.no_due?'Sem data':formatDate(t.due_at)}</Text></View>
       </View>
       <View style={s.priorityWrap}>
         {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:7,paddingVertical:5,borderRadius:5}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
         <View style={[s.priorityLine,{backgroundColor:late?(appearance==='dark'?'#FF887B':'#B83931'):priorityColors[t.priority]}]}/>
+      </View>
+    </Pressable>;
+  }
+  /**
+   * Subtarefa em linha compacta: herda assunto, data e urgência da principal, então
+   * mostra só a caixa e o título, recuada e sem fundo próprio (antes ficava espremida).
+   */
+  function subCard(t:Task){
+    return <Pressable key={t.id} style={s.subTask} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+      <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} hitSlop={8} onPress={()=>toggle(t)} style={[s.check,s.subCheck,!!t.completed?s.checked:undefined]}>
+        <Text style={[s.checkText,{fontSize:13}]}>{t.completed?'✓':''}</Text>
+      </Pressable>
+      <View style={{flex:1}}>
+        <TaskTitle key={`${t.id}-${t.completed}`} title={t.title} completed={!!t.completed} colors={c} style={{fontSize:15,fontWeight:'600'}}/>
       </View>
     </Pressable>;
   }
@@ -201,6 +216,8 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   section:{color:c.text,fontSize:12,fontWeight:'900',letterSpacing:1.5},sectionCount:{color:c.accent,fontSize:14,fontWeight:'900'},
   task:{paddingVertical:19,flexDirection:'row',alignItems:'center',gap:14,borderBottomWidth:1,borderBottomColor:c.border},
   check:{width:27,height:27,borderRadius:6,borderWidth:2,borderColor:c.muted,alignItems:'center',justifyContent:'center'},
+  subTask:{flexDirection:'row',alignItems:'center',gap:12,marginLeft:13,paddingLeft:28,paddingRight:4,paddingVertical:11,borderLeftWidth:2,borderLeftColor:c.accentSoft,borderBottomWidth:1,borderBottomColor:c.border},
+  subCheck:{width:22,height:22,borderRadius:5},
   checked:{backgroundColor:c.accent,borderColor:c.accent},checkText:{color:c.background,fontWeight:'900',fontSize:16},
   taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},
   taskDescription:{color:c.muted,fontSize:13,lineHeight:18},

@@ -16,7 +16,7 @@ export default function Routines(){
  {items.length===0?<Text style={{color:c.muted,marginTop:30}}>Nenhuma rotina criada. Marque “Tarefa diária” ao criar uma missão.</Text>:null}
  {items.map(t=><View key={t.id} style={{backgroundColor:c.surface,borderColor:c.border,borderWidth:1,borderRadius:12,padding:16,gap:12}}>
    <View style={{flexDirection:'row',justifyContent:'space-between',gap:10}}><Text style={{color:c.text,fontSize:17,fontWeight:'900',flex:1}}>{t.title}</Text><Text style={{color:t.daily_active?c.accent:c.muted,fontWeight:'800',fontSize:11}}>{t.daily_active?'ATIVA':'PAUSADA'}</Text></View>
-   <Text style={{color:c.muted,fontSize:12}}>↻ Todos os dias · {new Date(t.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</Text>
+   <Text style={{color:c.muted,fontSize:12}}>↻ Todos os dias{t.no_due?' · sem horário':' · '+new Date(t.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</Text>
    <View style={{flexDirection:'row',gap:8}}>
      <Pressable accessibilityRole="button" onPress={()=>toggle(t)} style={{backgroundColor:c.accentSoft,padding:11,borderRadius:7,flex:1,alignItems:'center'}}><Text style={{color:c.accent,fontWeight:'900'}}>{t.daily_active?'PAUSAR':'RETOMAR'}</Text></Pressable>
      <Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} style={{backgroundColor:c.surfaceRaised,padding:11,borderRadius:7,flex:1,alignItems:'center'}}><Text style={{color:c.text,fontWeight:'900'}}>EDITAR</Text></Pressable>

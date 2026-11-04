@@ -98,6 +98,8 @@ async function replaceReminders(id:number,task:TaskInput,completed:boolean){
 export async function listChildren(parentId:number){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id=? ORDER BY id ASC',parentId);}
 export async function saveTaskGroup(task:TaskInput,children:ChildInput[],id?:number,daily=false){
   const db=await ready;
+  // Só um nível: uma subtarefa não recebe subtarefas nem vira rotina.
+  if(id!==undefined&&(await getTask(id))?.parent_id){children=[];daily=false;}
   const clean=children.map(child=>({id:child.id,title:child.title.trim()})).filter(child=>child.title.length>0);
   const submittedIds=clean.filter(child=>child.id!==undefined).map(child=>child.id!);
   if(new Set(submittedIds).size!==submittedIds.length)throw new Error('Subtarefas duplicadas no formulário.');
