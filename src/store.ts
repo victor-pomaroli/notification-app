@@ -55,6 +55,59 @@ export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){
   for(const child of children){const group=byParent.get(child.parent_id!)??[];group.push(child);byParent.set(child.parent_id!,group);}
   return roots.flatMap(root=>[root,...(byParent.get(root.id)??[])]);
 }
+// Calendar queries: indexed timestamp ranges, root tasks only, no N+1 lookups.
+export type CalendarDaySummary={day:string;total:number;completed:number};
+export type CalendarEntry={task:Task;occurrenceDay:string;completed:boolean;routine:boolean};
+function calendarKey(timestamp:number){return localDay(new Date(timestamp));}
+export async function listCalendarMonth(start:number,end:number):Promise<CalendarDaySummary[]>{
+  await syncDailyTasks();
+  const db=await ready;
+  const ordinary=await db.getAllAsync<{due_at:number;completed:number}>(
+    'SELECT due_at,completed FROM tasks WHERE parent_id IS NULL AND daily=0 AND archived_at IS NULL AND due_at>=? AND due_at<?',
+    start,end);
+  const active=await db.getAllAsync<{id:number;daily_day:string|null;due_at:number;completed:number}>(
+    'SELECT id,daily_day,due_at,completed FROM tasks WHERE parent_id IS NULL AND daily=1 AND daily_active=1 AND archived_at IS NULL');
+  const history=await db.getAllAsync<{task_id:number;day:string;completed:number}>(
+    'SELECT h.task_id,h.day,h.completed FROM daily_history h JOIN tasks t ON t.id=h.task_id WHERE t.daily=1 AND t.parent_id IS NULL AND h.day>=? AND h.day<?',
+    calendarKey(start),calendarKey(end));
+  const summaries=new Map<string,CalendarDaySummary>();
+  const add=(day:string,completed:boolean)=>{const row=summaries.get(day)??{day,total:0,completed:0};row.total++;if(completed)row.completed++;summaries.set(day,row);};
+  for(const task of ordinary)add(calendarKey(task.due_at),!!task.completed);
+  const historyByTask=new Map<number,Map<string,boolean>>();
+  for(const row of history){const days=historyByTask.get(row.task_id)??new Map<string,boolean>();days.set(row.day,!!row.completed);historyByTask.set(row.task_id,days);}
+  const today=localDay();
+  for(const task of active){
+    const past=historyByTask.get(task.id);
+    for(let cursor=new Date(start);cursor.getTime()<end;cursor.setDate(cursor.getDate()+1)){
+      const day=localDay(cursor);
+      if(day>today) add(day,false);
+      else if(day===today)add(day,!!task.completed);
+      else if(past?.has(day))add(day,!!past.get(day));
+    }
+  }
+  return [...summaries.values()];
+}
+export async function listCalendarDay(start:number,end:number):Promise<CalendarEntry[]>{
+  await syncDailyTasks();
+  const db=await ready;
+  const day=calendarKey(start);
+  const ordinary=await db.getAllAsync<Task>(
+    'SELECT * FROM tasks WHERE parent_id IS NULL AND daily=0 AND archived_at IS NULL AND due_at>=? AND due_at<? ORDER BY due_at ASC,id ASC',
+    start,end);
+  const routines=await db.getAllAsync<Task>(
+    'SELECT * FROM tasks WHERE parent_id IS NULL AND daily=1 AND daily_active=1 AND archived_at IS NULL ORDER BY due_at ASC,id ASC');
+  const history=day<localDay()?await db.getAllAsync<{task_id:number;completed:number}>(
+    'SELECT task_id,completed FROM daily_history WHERE day=?',day):[];
+  const byId=new Map(history.map(x=>[x.task_id,!!x.completed]));
+  const entries:CalendarEntry[]=ordinary.map(task=>({task,occurrenceDay:day,completed:!!task.completed,routine:false}));
+  for(const task of routines){
+    if(day>localDay() || day===localDay() || byId.has(task.id)){
+      entries.push({task,occurrenceDay:day,completed:day===localDay()?!!task.completed:byId.get(task.id)??false,routine:true});
+    }
+  }
+  entries.sort((a,b)=>{const da=new Date(a.task.due_at),db=new Date(b.task.due_at);return (da.getHours()*60+da.getMinutes())-(db.getHours()*60+db.getMinutes());});
+  return entries;
+}
 export async function listArchivedTasks(limit=50,offset=0){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NOT NULL ORDER BY archived_at DESC LIMIT ? OFFSET ?',limit,offset);}
 export async function archiveTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=? WHERE (id=? OR parent_id=?) AND completed=1',Date.now(),id,id);await refreshWidget();}
 export async function restoreArchivedTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=NULL WHERE id=? OR parent_id=?',id,id);await refreshWidget();}
