@@ -1,7 +1,7 @@
 import React,{useCallback,useState} from 'react';
 import {View,Text,ScrollView,Pressable,Alert} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
-import {listRoutines,setRoutineActive,routineHistory,Task} from '../src/store';
+import {listRoutines,setRoutineActive,endRoutine,routineHistory,Task} from '../src/store';
 import {useAppTheme} from '../src/theme';
 export default function Routines(){
  const {colors:c}=useAppTheme();const router=useRouter();
@@ -21,7 +21,7 @@ export default function Routines(){
      <Pressable accessibilityRole="button" onPress={()=>toggle(t)} style={{backgroundColor:c.accentSoft,padding:11,borderRadius:7,flex:1,alignItems:'center'}}><Text style={{color:c.accent,fontWeight:'900'}}>{t.daily_active?'PAUSAR':'RETOMAR'}</Text></Pressable>
      <Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} style={{backgroundColor:c.surfaceRaised,padding:11,borderRadius:7,flex:1,alignItems:'center'}}><Text style={{color:c.text,fontWeight:'900'}}>EDITAR</Text></Pressable>
    </View>
-   <Pressable accessibilityRole="button" onPress={()=>Alert.alert('Encerrar rotina?', 'A tarefa deixará de se repetir. O histórico será preservado.',[{text:'Cancelar',style:'cancel'},{text:'Encerrar',style:'destructive',onPress:()=>setRoutineActive(t.id,false).then(()=>router.push({pathname:'/edit',params:{id:String(t.id)}})).catch(e=>Alert.alert('Erro',String(e)))}])}><Text style={{color:c.muted,fontSize:12,textAlign:'center',textDecorationLine:'underline'}}>Encerrar repetição</Text></Pressable>
+   <Pressable accessibilityRole="button" onPress={()=>Alert.alert('Encerrar rotina?', 'A tarefa deixará de se repetir. O histórico será preservado.',[{text:'Cancelar',style:'cancel'},{text:'Encerrar',style:'destructive',onPress:()=>endRoutine(t.id).then(load).catch(e=>Alert.alert('Erro',String(e)))}])}><Text style={{color:c.muted,fontSize:12,textAlign:'center',textDecorationLine:'underline'}}>Encerrar repetição</Text></Pressable>
    <Text style={{color:c.muted,fontSize:11}}>ÚLTIMOS REGISTROS</Text>
    <Text style={{color:c.text,fontSize:12}}>{history[t.id]?.length?history[t.id].map(h=>h.day.slice(5)+' '+(h.completed?'✓':'–')).join('  ·  '):'Nenhuma conclusão registrada ainda'}</Text>
  </View>)}
