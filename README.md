@@ -1,4 +1,4 @@
-# Notification App
+# Ping
 
 Aplicativo mobile de tarefas em React Native + Expo, com tema escuro, SQLite local e notificações no vencimento.
 

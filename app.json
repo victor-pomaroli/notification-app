@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Ping",
-    "slug": "minhas-tarefas",
-    "scheme": "minhastarefas",
+    "slug": "ping",
+    "scheme": "ping",
     "icon": "./assets/icon.png",
     "plugins": [
       "expo-router",
@@ -11,7 +11,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#8CE01F",
+          "color": "#D7FC65",
           "defaultChannel": "tasks"
         }
       ],
@@ -34,10 +34,10 @@
       ]
     ],
     "android": {
-      "package": "com.example.minhastarefas",
+      "package": "com.example.ping",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#F4F1E7"
+        "backgroundColor": "#0A0A09"
       },
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
@@ -45,7 +45,7 @@
       ]
     },
     "ios": {
-      "bundleIdentifier": "com.example.minhastarefas"
+      "bundleIdentifier": "com.example.ping"
     },
     "extra": {
       "router": {
