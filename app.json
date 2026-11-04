@@ -11,7 +11,7 @@
       [
         "expo-notifications",
         {
-          "defaultChannel": "tasks"
+          "defaultChannel": "tasks-feedback-v2"
         }
       ],
       [
