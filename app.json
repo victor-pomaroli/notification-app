@@ -1,4 +1,3 @@
-
 {
   "expo": {
     "name": "Ping",
@@ -41,6 +40,16 @@
     },
     "ios": {
       "bundleIdentifier": "com.example.minhastarefas"
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "642c8d8f-c000-4d9c-8e27-54a5862fad11"
+      }
     }
   }
 }
