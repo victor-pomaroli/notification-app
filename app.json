@@ -10,6 +10,8 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
+          "color": "#8CE01F",
           "defaultChannel": "tasks"
         }
       ],
@@ -36,7 +38,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#F4F1E7"
-      }
+      },
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM"
+      ]
     },
     "ios": {
       "bundleIdentifier": "com.example.minhastarefas"
