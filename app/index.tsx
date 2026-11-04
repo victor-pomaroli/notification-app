@@ -73,12 +73,14 @@ export default function Home(){
       </Pressable>
       <View style={{flex:1,gap:7}}>
         <Text style={[s.taskTitle,late?{color:appearance==='dark'?'#FFB5A9':'#A82F27',fontWeight:'900'}:undefined,!!t.completed?s.completed:undefined]}>{t.title}</Text>
+        {t.description?.trim()?<Text style={s.taskDescription} numberOfLines={2}>{t.description.trim()}</Text>:null}
         <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{formatDate(t.due_at)}</Text></View>
       </View>
       <View style={s.priorityWrap}>
         {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:7,paddingVertical:5,borderRadius:5}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
         <View style={[s.priorityLine,{backgroundColor:late?(appearance==='dark'?'#FF887B':'#B83931'):({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[t.priority]}]}/>
       </View>
+      {t.completed?<View pointerEvents="none" style={s.strike}/>:null}
     </Pressable>;
   }
   const empty=(message:string)=><Text style={s.empty}>{message}</Text>;
@@ -166,7 +168,9 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   task:{paddingVertical:19,flexDirection:'row',alignItems:'center',gap:14,borderBottomWidth:1,borderBottomColor:c.border},
   check:{width:27,height:27,borderRadius:6,borderWidth:2,borderColor:c.muted,alignItems:'center',justifyContent:'center'},
   checked:{backgroundColor:c.accent,borderColor:c.accent},checkText:{color:c.background,fontWeight:'900',fontSize:16},
-  taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},completed:{textDecorationLine:'line-through',color:c.muted},
+  taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},completed:{color:c.muted},
+  taskDescription:{color:c.muted,fontSize:13,lineHeight:18},
+  strike:{position:'absolute',left:0,right:0,top:'50%',height:2,marginTop:-1,borderRadius:1,backgroundColor:c.muted},
   meta:{color:c.muted,fontSize:11},late:{color:c.danger,fontSize:10,fontWeight:'900',letterSpacing:0.8},
   priority:{color:c.muted,fontSize:9,fontWeight:'800'},
   priorityWrap:{alignItems:'center',justifyContent:'center',gap:6},

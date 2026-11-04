@@ -4,6 +4,7 @@ import type {Task} from '../store';
 import {categories} from '../templates';
 
 const palette={background:'#111310',surface:'#1C201A',text:'#F4F1E7',muted:'#A4AA9A',accent:'#D7FC65',danger:'#FF887B',divider:'#353C30'} as const;
+export const COMPLETE_ACTION='COMPLETE_TASK';
 export type WidgetTask=Pick<Task,'id'|'title'|'due_at'|'category'>;
 
 // Alturas aproximadas em dp, usadas para decidir quantas tarefas cabem sem cortar o botão.
@@ -46,8 +47,11 @@ export function PingTasksWidget({tasks=[],height}:{tasks?:WidgetTask[];height?:n
     {tasks.length===0?<FlexWidget style={{paddingTop:8,paddingBottom:8,flexDirection:'column',width:'match_parent'}} clickAction="OPEN_APP">
       <TextWidget text="Tudo em dia." style={{color:palette.text,fontSize:16,fontWeight:'bold'}} maxLines={1} truncate="END"/>
       <TextWidget text="Crie uma tarefa no Ping para começar." style={{color:palette.muted,fontSize:12,marginTop:4}} maxLines={2} truncate="END"/>
-    </FlexWidget>:visible.map((task,i)=><FlexWidget key={task.id} clickAction="OPEN_URI" clickActionData={{uri:`ping://edit?id=${task.id}`}} style={{flexDirection:'row',alignItems:'center',width:'match_parent',paddingTop:compact?6:7,paddingBottom:compact?6:7,borderTopWidth:i?1:0,borderColor:palette.divider}}>
-      <FlexWidget style={{width:7,height:7,borderRadius:4,backgroundColor:task.due_at<now?palette.danger:palette.accent,marginRight:9}}/>
+    </FlexWidget>:visible.map((task,i)=><FlexWidget key={task.id} clickAction="OPEN_URI" clickActionData={{uri:`ping://edit?id=${task.id}`}} style={{flexDirection:'row',alignItems:'center',width:'match_parent',paddingTop:compact?4:7,paddingBottom:compact?4:7,borderTopWidth:i?1:0,borderColor:palette.divider}}>
+      {/* Área de toque maior que a caixa; o toque aqui conclui em vez de abrir a tarefa. */}
+      <FlexWidget clickAction={COMPLETE_ACTION} clickActionData={{id:task.id}} style={{width:30,height:22,justifyContent:'center',alignItems:'flex-start'}}>
+        <FlexWidget style={{width:16,height:16,borderRadius:4,borderWidth:2,borderColor:task.due_at<now?palette.danger:palette.accent}}/>
+      </FlexWidget>
       {compact?<FlexWidget style={{flex:1,flexDirection:'row',alignItems:'center'}}>
         <FlexWidget style={{flex:1}}>
           <TextWidget text={task.title} style={{color:palette.text,fontSize:13,fontWeight:'bold'}} maxLines={1} truncate="END"/>
