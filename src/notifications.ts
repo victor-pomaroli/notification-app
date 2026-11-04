@@ -6,12 +6,13 @@ import {reminderMessage,reminderOffsets,TaskCategory,ReminderStage} from './temp
 Notifications.setNotificationHandler({
   handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false}),
 });
-const CHANNEL='tasks';
+const CHANNEL='tasks-feedback-v2';
 export type ScheduledReminder={notification_id:string;stage:number;scheduled_at:number};
 export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory;daily?:boolean};
 export async function setupNotifications(){
   if(Platform.OS==='android') await Notifications.setNotificationChannelAsync(CHANNEL,{
     name:'Lembretes de tarefas',importance:Notifications.AndroidImportance.HIGH,
+    sound:'default',enableVibrate:true,vibrationPattern:[0,250,150,250],
   });
   const current=await Notifications.getPermissionsAsync();
   if(!current.granted && current.canAskAgain) await Notifications.requestPermissionsAsync();
