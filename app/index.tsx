@@ -61,9 +61,9 @@ export default function Home(){
   async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.length,taskCategoryFilter==='all'?undefined:taskCategoryFilter);setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
   const roots=tasks.filter(t=>!t.parent_id);
   const pending=roots.filter(t=>!t.completed);
-  const overdue=pending.filter(t=>t.due_at<now);
-  const upcoming=pending.filter(t=>t.due_at>=now);
-  const today=pending.filter(t=>new Date(t.due_at).toDateString()===new Date(now).toDateString());
+  const overdue=pending.filter(t=>!t.daily&&t.due_at<now);
+  const upcoming=pending.filter(t=>t.daily||t.due_at>=now);
+  const today=pending.filter(t=>t.daily||new Date(t.due_at).toDateString()===new Date(now).toDateString());
   async function toggle(t:Task){
     try{await completeTask(t.id,!t.completed);await refresh();}
     catch(e){setFeedback({title:'Não deu certo.',message:String(e)});}
@@ -78,7 +78,7 @@ export default function Home(){
   }
   function groupedCards(items:Task[]){return items.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...tasks.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
   function card(t:Task){
-    const late=!t.completed&&t.due_at<now;
+    const late=!t.completed&&!t.daily&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
     return <Pressable key={t.id} style={[s.task,t.parent_id?{marginLeft:28,paddingLeft:12,borderLeftWidth:2,borderLeftColor:c.accentSoft,backgroundColor:c.surface}:undefined,late?{borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
       {late?<View pointerEvents="none" style={{position:'absolute',left:-12,right:-12,top:5,bottom:5,backgroundColor:appearance==='dark'?'#34201E':'#F8E2DC',borderRadius:10,borderWidth:1,borderColor:appearance==='dark'?'#77423D':'#E5B0A5'}}/>:null}
@@ -88,7 +88,7 @@ export default function Home(){
       </Pressable>
       <View style={{flex:1,gap:7}}>
         <TaskTitle key={`${t.id}-${t.completed}`} title={t.title} completed={!!t.completed} colors={c}/>
-        <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{formatDate(t.due_at)}</Text></View>
+        <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{t.daily?'↻ DIÁRIA · '+new Date(t.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):formatDate(t.due_at)}</Text></View>
       </View>
       <View style={s.priorityWrap}>
         {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:7,paddingVertical:5,borderRadius:5}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
@@ -128,6 +128,7 @@ export default function Home(){
         {upcoming.length?groupedCards(upcoming.slice(0,8)):empty('Nenhuma tarefa futura. Que paz suspeita.')}
       </>:<>
         <View style={s.sectionHead}><Text style={s.section}>{page==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(page==='tasks'?filteredTasks.length:overdue.length).padStart(2,'0')}</Text></View>
+        {page==='tasks'?<Pressable accessibilityRole="button" onPress={()=>router.push('/routines')} style={{alignSelf:'flex-start',borderWidth:1,borderColor:c.accent,borderRadius:9,paddingHorizontal:15,paddingVertical:12,marginBottom:16,backgroundColor:c.accentSoft}}><Text style={{color:c.accent,fontWeight:'900',fontSize:12}}>↻ MINHAS ROTINAS</Text></Pressable>:null}
         {page==='tasks'?<View style={{marginBottom:18}}><View style={{flexDirection:'row',flexWrap:'wrap',gap:8,paddingVertical:3}}>{([{key:'all',label:'Todas'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={{paddingHorizontal:15,paddingVertical:11,borderRadius:999,borderWidth:1,borderColor:active?topic.text:c.border,backgroundColor:active?topic.surface:c.surface}}><Text style={{color:active?topic.text:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</View></View>:null}
         {page==='tasks'?(filteredTasks.length?groupedCards(filteredPage):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')):(overdue.length?groupedCards(overdue):empty('Tudo em dia. Assim que a gente gosta.'))}
       </>}

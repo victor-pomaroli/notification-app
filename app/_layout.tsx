@@ -19,6 +19,6 @@ function AppStack(){
   return <><StatusBar style={appearance==='dark'?"light":"dark"}/><Stack screenOptions={{
     headerStyle:{backgroundColor:theme.background},headerTintColor:theme.text,
     headerShadowVisible:false,contentStyle:{backgroundColor:theme.background},
-  }}><Stack.Screen name="index" options={{headerShown:false}}/><Stack.Screen name="onboarding" options={{headerShown:false,gestureEnabled:false}}/><Stack.Screen name="settings" options={{title:"Ajustes"}}/><Stack.Screen name="archive" options={{title:"Histórico"}}/><Stack.Screen name="edit" options={{title:'Detalhes da tarefa'}}/></Stack></>;
+  }}><Stack.Screen name="index" options={{headerShown:false}}/><Stack.Screen name="onboarding" options={{headerShown:false,gestureEnabled:false}}/><Stack.Screen name="settings" options={{title:"Ajustes"}}/><Stack.Screen name="routines" options={{title:"Minhas rotinas"}}/><Stack.Screen name="archive" options={{title:"Histórico"}}/><Stack.Screen name="edit" options={{title:'Detalhes da tarefa'}}/></Stack></>;
 }
 export default function Layout(){return <ThemeProvider><AppStack/></ThemeProvider>;}

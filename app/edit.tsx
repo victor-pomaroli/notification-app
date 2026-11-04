@@ -18,6 +18,7 @@ export default function Edit(){
   const [priority,setPriority]=useState<'low'|'medium'|'high'>('medium');
   const [category,setCategory]=useState<TaskCategory>('general');
   const [completed,setCompleted]=useState(false);
+  const [daily,setDaily]=useState(false);
   const [picker,setPicker]=useState<'date'|'time'|null>(null);
   const [month,setMonth]=useState(new Date());
   const [hour,setHour]=useState('00');
@@ -38,13 +39,13 @@ export default function Edit(){
   }
   const [saving,setSaving]=useState(false);
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
-  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>row.title))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);}}).catch(console.warn);},[id]);
+  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>row.title))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);setDaily(!!t.daily);}}).catch(console.warn);},[id]);
   async function save(){
     if(!title.trim()){setFeedback({title:'Faltou o principal.',message:'Dá um nome para essa tarefa antes de continuar.'});return;}
     if(saving)return;
     setSaving(true);
     try{
-      const result=await saveTaskGroup({title:title.trim(),description:'',due_at:due.getTime(),priority,category},children,id?Number(id):undefined);
+      const result=await saveTaskGroup({title:title.trim(),description:'',due_at:due.getTime(),priority,category},children,id?Number(id):undefined,daily);
       const prefs=await getPreferences().catch(()=>null);
       const permission=prefs?.notifications?await Notifications.getPermissionsAsync().catch(()=>null):null;
       router.back();
@@ -74,6 +75,10 @@ export default function Edit(){
       </Pressable>
     </View>
     <Text style={s.helper}>A primeira tarefa é a principal. Concluí-la também conclui todas as etapas associadas.</Text>
+    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:daily}} onPress={()=>setDaily(value=>!value)} style={{flexDirection:'row',alignItems:'center',gap:13,backgroundColor:c.surface,borderColor:daily?c.accent:c.border,borderWidth:1,borderRadius:10,padding:16,marginTop:22}}>
+      <View style={{width:24,height:24,borderWidth:2,borderRadius:6,borderColor:daily?c.accent:c.muted,backgroundColor:daily?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}><Text style={{color:c.background,fontWeight:'900'}}>{daily?'✓':''}</Text></View>
+      <View style={{flex:1}}><Text style={{color:c.text,fontSize:15,fontWeight:'800'}}>Tarefa diária ↻</Text><Text style={{color:c.muted,fontSize:12,marginTop:3}}>Repetir todos os dias no mesmo horário</Text></View>
+    </Pressable>
     <Text style={s.label}>03 / QUANDO?</Text>
     <View style={s.scheduleCard}>
       <Pressable style={s.scheduleRow} onPress={()=>openPicker('date')}>
@@ -118,7 +123,7 @@ export default function Edit(){
         <Pressable style={s.modalCancel} onPress={()=>setPicker(null)}><Text style={s.choiceText}>CANCELAR</Text></Pressable>
       </View></View>
     </Modal>
-    <Text style={s.helper}>Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.</Text>
+    <Text style={s.helper}>{daily?'Uma notificação por dia, no horário escolhido. Silêncio entre 22h e 7h.':'Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.'}</Text>
     <Text style={s.label}>04 / QUAL O ASSUNTO?</Text>
     <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=><Pressable key={key} style={[s.choice,{flexBasis:'29%'},category===key&&s.selected]} onPress={()=>setCategory(key)}><Text style={[s.choiceText,category===key&&s.selectedText]}>{({study:'📚',work:'💼',finance:'💸',home:'🏠',health:'💚',general:'✨'} as const)[key]} {categories[key]}</Text></Pressable>)}</View>
     <Text style={s.label}>05 / QUAL A URGÊNCIA?</Text>
