@@ -2,7 +2,7 @@ import React,{useCallback,useRef,useState} from 'react';
 import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar,Dimensions,Animated,TextStyle} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,deleteTask} from '../src/store';
+import {localDay,Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,deleteTask} from '../src/store';
 import {categories,TaskCategory} from '../src/templates';
 import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
@@ -40,7 +40,13 @@ export default function Home(){
   // Enquanto o dedo está na faixa de filtros, o swipe entre abas fica travado.
   const [filtersTouched,setFiltersTouched]=useState(false);
   const tabs:Tab[]=['home','tasks','calendar'];
-  const goToTab=(next:Tab)=>{setTab(next);pager.current?.scrollTo({x:tabs.indexOf(next)*pageWidth,animated:true});};
+  // Dia escolhido no calendário; o botão + cria a tarefa nele quando a aba Calendário está na tela.
+  const [calendarDay,setCalendarDay]=useState(()=>new Date());
+  // Página real do pager (atualizada a cada frame de rolagem). `tab` só muda no fim do gesto,
+  // então o + consulta isto para não criar no calendário estando em Tarefas, ou o contrário.
+  const pageRef=useRef(0),pageWidthRef=useRef(Dimensions.get('window').width);
+  const opening=useRef(false);
+  const goToTab=(next:Tab)=>{setTab(next);pageRef.current=tabs.indexOf(next);pager.current?.scrollTo({x:tabs.indexOf(next)*pageWidth,animated:true});};
   const [now,setNow]=useState(Date.now());
   const [deleteTarget,setDeleteTarget]=useState<Task|null>(null);
   const [busyDelete,setBusyDelete]=useState(false);
@@ -49,11 +55,19 @@ export default function Home(){
   const insets=useSafeAreaInsets();
   const refresh=useCallback(async()=>{await archiveOldCompletedTasks();const all=await listTasks();setTasks(all);setVisibleTaskCount(50);setNow(Date.now());},[]);
   useFocusEffect(useCallback(()=>{
+    opening.current=false;
     refresh().catch(console.warn);
     const sub=AppState.addEventListener('change',state=>{if(state==='active')refresh().catch(console.warn);});
     const interval=setInterval(()=>setNow(Date.now()),30000);
     return ()=>{sub.remove();clearInterval(interval);};
   },[refresh]));
+  function openCreate(){
+    // Um toque só: evita abrir duas telas de criação com toque duplo.
+    if(opening.current)return;
+    opening.current=true;
+    if(tabs[pageRef.current]==='calendar')router.push({pathname:'/edit',params:{date:localDay(calendarDay)}});
+    else router.push('/edit');
+  }
   const filteredTasks=tasks.filter(t=>!t.parent_id&&(taskCategoryFilter==='all'||t.category===taskCategoryFilter));
   const [filteredPage,setFilteredPage]=useState<Task[]>([]);
   React.useEffect(()=>{let active=true;listTaskPage(50,0,taskCategoryFilter==='all'?undefined:taskCategoryFilter).then(rows=>{if(active){setFilteredPage(rows);setVisibleTaskCount(50);}}).catch(console.warn);return()=>{active=false;};},[taskCategoryFilter,tasks]);
@@ -121,9 +135,9 @@ export default function Home(){
     <StatusBar barStyle={c.background==='#111310'?"light-content":"dark-content"}/>
     <Animated.ScrollView ref={pager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} scrollEnabled={!filtersTouched}
       style={{flex:1}} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
-      onScroll={Animated.event([{nativeEvent:{contentOffset:{x:horizontalX}}}],{useNativeDriver:true})}
-      onLayout={event=>{const width=event.nativeEvent.layout.width;if(width>0&&width!==pageWidth){setPageWidth(width);pager.current?.scrollTo({x:tabs.indexOf(tab)*width,animated:false});}}}
-      onMomentumScrollEnd={event=>{const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));setTab(tabs[index]);}}
+      onScroll={Animated.event([{nativeEvent:{contentOffset:{x:horizontalX}}}],{useNativeDriver:true,listener:(event:any)=>{const width=pageWidthRef.current;if(width>0)pageRef.current=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/width)));}})}
+      onLayout={event=>{const width=event.nativeEvent.layout.width;if(width>0&&width!==pageWidth){setPageWidth(width);pageWidthRef.current=width;pager.current?.scrollTo({x:tabs.indexOf(tab)*width,animated:false});}}}
+      onMomentumScrollEnd={event=>{const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));pageRef.current=index;setTab(tabs[index]);}}
     >
       {tabs.map((page,index)=><View key={page} style={{width:pageWidth,flex:1}}>
       <Animated.ScrollView style={{flex:1}} contentContainerStyle={[s.container,{paddingTop:insets.top+89}]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
@@ -146,7 +160,7 @@ export default function Home(){
         {upcoming.length?groupedCards(tasks.filter(t=>upcoming.slice(0,8).some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nenhuma tarefa futura. Que paz suspeita.')}
         <View style={s.sectionHead}><Text style={s.section}>CONCLUÍDAS HOJE</Text><Text style={s.sectionCount}>{String(completedToday.length).padStart(2,'0')}</Text></View>
         {completedToday.length?groupedCards(tasks.filter(t=>completedToday.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada concluído hoje. Ainda dá tempo.')}
-      </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks}/>:<>
+      </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks} selected={calendarDay} onSelect={setCalendarDay}/>:<>
         <View style={s.tasksHead}>
           <Text style={s.section}>TODAS AS TAREFAS</Text>
           <Text style={[s.sectionCount,{marginLeft:9}]}>{String(filteredTasks.length).padStart(2,'0')}</Text>
@@ -182,7 +196,7 @@ export default function Home(){
       </Animated.View>
       </View>)}
     </Animated.ScrollView>
-    {<Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>}
+    {<Pressable accessibilityLabel={tab==='calendar'?'Criar tarefa em '+calendarDay.toLocaleDateString('pt-BR',{day:'numeric',month:'long'}):'Criar tarefa'} style={[s.add,{bottom:91+insets.bottom}]} onPress={openCreate}><Text style={s.plus}>+</Text></Pressable>}
     <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','calendar'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
       <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','CALENDÁRIO'][i]}</Text>
       {tab===key?<View style={s.dot}/>:null}

@@ -61,32 +61,14 @@ export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){
 export type CalendarDaySummary={day:string;total:number;completed:number};
 export type CalendarEntry={task:Task;occurrenceDay:string;completed:boolean;routine:boolean};
 function calendarKey(timestamp:number){return localDay(new Date(timestamp));}
+/** Resumo do mês para as bolinhas: só tarefas com data. Rotinas diárias ficam de fora para as datas se destacarem. */
 export async function listCalendarMonth(start:number,end:number):Promise<CalendarDaySummary[]>{
-  await syncDailyTasks();
   const db=await ready;
   const ordinary=await db.getAllAsync<{due_at:number;completed:number}>(
     'SELECT due_at,completed FROM tasks WHERE parent_id IS NULL AND daily=0 AND no_due=0 AND archived_at IS NULL AND due_at>=? AND due_at<?',
     start,end);
-  const active=await db.getAllAsync<{id:number;daily_day:string|null;due_at:number;completed:number}>(
-    'SELECT id,daily_day,due_at,completed FROM tasks WHERE parent_id IS NULL AND daily=1 AND daily_active=1 AND archived_at IS NULL');
-  const history=await db.getAllAsync<{task_id:number;day:string;completed:number}>(
-    'SELECT h.task_id,h.day,h.completed FROM daily_history h JOIN tasks t ON t.id=h.task_id WHERE t.daily=1 AND t.parent_id IS NULL AND h.day>=? AND h.day<?',
-    calendarKey(start),calendarKey(end));
   const summaries=new Map<string,CalendarDaySummary>();
-  const add=(day:string,completed:boolean)=>{const row=summaries.get(day)??{day,total:0,completed:0};row.total++;if(completed)row.completed++;summaries.set(day,row);};
-  for(const task of ordinary)add(calendarKey(task.due_at),!!task.completed);
-  const historyByTask=new Map<number,Map<string,boolean>>();
-  for(const row of history){const days=historyByTask.get(row.task_id)??new Map<string,boolean>();days.set(row.day,!!row.completed);historyByTask.set(row.task_id,days);}
-  const today=localDay();
-  for(const task of active){
-    const past=historyByTask.get(task.id);
-    for(let cursor=new Date(start);cursor.getTime()<end;cursor.setDate(cursor.getDate()+1)){
-      const day=localDay(cursor);
-      if(day>today) add(day,false);
-      else if(day===today)add(day,!!task.completed);
-      else if(past?.has(day))add(day,!!past.get(day));
-    }
-  }
+  for(const task of ordinary){const day=calendarKey(task.due_at);const row=summaries.get(day)??{day,total:0,completed:0};row.total++;if(task.completed)row.completed++;summaries.set(day,row);}
   return [...summaries.values()];
 }
 export async function listCalendarDay(start:number,end:number):Promise<CalendarEntry[]>{
