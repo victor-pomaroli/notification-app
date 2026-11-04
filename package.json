@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "deps:fix": "expo install --fix",
-    "deps:check": "expo install --check"
+    "deps:check": "expo install --check",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.16",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@types/react": "*",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   }
 }

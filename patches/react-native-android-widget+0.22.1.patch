@@ -1,0 +1,33 @@
+diff --git a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
+index 0f963f0..be9b71c 100644
+--- a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
++++ b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
+@@ -90,11 +90,16 @@ public class RNWidgetImageProvider extends ContentProvider {
+         File folder = getFolderWithImages(context);
+         if (!folder.exists()) folder.mkdirs();
+         File file = new File(folder, imageName);
++        // Write to a temp file and rename it over the target. Writing in place truncates the
++        // PNG the launcher may be reading at that moment, which makes the widget blink empty.
++        File tmp = new File(folder, imageName + ".tmp");
+ 
+         FileOutputStream fos = null;
++        boolean written = false;
+         try {
+-            fos = new FileOutputStream(file);
+-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
++            fos = new FileOutputStream(tmp);
++            written = bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
++            fos.getFD().sync();
+         } catch (Exception e) {
+             e.printStackTrace();
+         } finally {
+@@ -106,6 +111,9 @@ public class RNWidgetImageProvider extends ContentProvider {
+                 e.printStackTrace();
+             }
+         }
++        if (!written || !tmp.renameTo(file)) {
++            tmp.delete();
++        }
+     }
+ 
+     static Uri getImageUri(Context context, String fileName) {

@@ -87,12 +87,22 @@ export async function saveTask(task:TaskInput,id?:number){
   await refreshWidget();
   return {id:taskId!,reminderError};
 }
-export async function completeTask(id:number,completed:boolean){
+/** Só grava o novo estado no banco (rápido). Retorna a tarefa ou null se não existir. */
+export async function setTaskCompleted(id:number,completed:boolean){
   const db=await ready;const task=await getTask(id);
-  if(!task)return;
+  if(!task)return null;
   await db.runAsync('UPDATE tasks SET completed=?,completed_at=?,archived_at=NULL WHERE id=?',completed?1:0,completed?Date.now():null,id);
-  await replaceReminders(id,task,completed);
-  if(completed)await dismissTaskNotifications(id);
+  return task;
+}
+/** Efeitos lentos da conclusão: cancela/reagenda lembretes e limpa a bandeja. */
+export async function syncTaskCompletion(task:Task,completed:boolean){
+  await replaceReminders(task.id,task,completed);
+  if(completed)await dismissTaskNotifications(task.id);
+}
+export async function completeTask(id:number,completed:boolean){
+  const task=await setTaskCompleted(id,completed);
+  if(!task)return;
+  await syncTaskCompletion(task,completed);
   await refreshWidget();
 }
 /** Botão "Adiar": tira o aviso da bandeja e agenda um novo daqui a alguns minutos. */
