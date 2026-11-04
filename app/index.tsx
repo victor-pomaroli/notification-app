@@ -82,7 +82,7 @@ export default function Home(){
         {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:7,paddingVertical:5,borderRadius:5}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
         <View style={[s.priorityLine,{backgroundColor:late?(appearance==='dark'?'#FF887B':'#B83931'):({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[t.priority]}]}/>
       </View>
-      {t.completed?<View pointerEvents="none" style={s.strike}/>:null}
+      {t.completed?<Strike seed={t.id} color={c.text}/>:null}
     </Pressable>;
   }
   const empty=(message:string)=><Text style={s.empty}>{message}</Text>;
@@ -174,7 +174,6 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   checked:{backgroundColor:c.accent,borderColor:c.accent},checkText:{color:c.background,fontWeight:'900',fontSize:16},
   taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},completed:{color:c.muted},
   taskDescription:{color:c.muted,fontSize:13,lineHeight:18},
-  strike:{position:'absolute',left:0,right:0,top:'50%',height:2,marginTop:-1,borderRadius:1,backgroundColor:c.muted},
   meta:{color:c.muted,fontSize:11},late:{color:c.danger,fontSize:10,fontWeight:'900',letterSpacing:0.8},
   priority:{color:c.muted,fontSize:9,fontWeight:'800'},
   priorityWrap:{alignItems:'center',justifyContent:'center',gap:6},
@@ -186,3 +185,24 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navSelected:{},navText:{color:c.muted,fontSize:10,fontWeight:'900',letterSpacing:1.4},
   navActive:{color:c.accent},dot:{width:16,height:3,borderRadius:3,backgroundColor:c.accent},
 });
+
+/**
+ * Risco de "feito" com cara de caneta: três trechos com inclinações levemente
+ * diferentes e uma segunda passada mais fraca. O seed (id da tarefa) varia os
+ * ângulos para que os riscos não fiquem todos idênticos.
+ */
+function Strike({seed,color}:{seed:number;color:string}){
+  const r=(n:number)=>{const x=Math.sin(seed*12.9898+n*78.233)*43758.5453;return x-Math.floor(x);};
+  const a=-1.6+r(1)*1.2, b=-0.3+r(2)*1.1, d=-1.4+r(3)*1.4;
+  const segment=(flex:number,deg:number,dy:number,radius:object)=>(
+    <View style={{flex,height:2.6,marginHorizontal:-1,backgroundColor:color,opacity:0.62,transform:[{translateY:dy},{rotate:deg+'deg'}],...radius}}/>
+  );
+  return <View pointerEvents="none" style={{position:'absolute',left:-4,right:-6,top:'50%',height:10,marginTop:-5}}>
+    <View style={{flexDirection:'row',alignItems:'center',height:10}}>
+      {segment(0.34,a,0.4,{borderTopLeftRadius:2,borderBottomLeftRadius:2})}
+      {segment(0.41,b,-0.3,{})}
+      {segment(0.25,d,0.5,{borderTopRightRadius:2,borderBottomRightRadius:2})}
+    </View>
+    <View style={{position:'absolute',left:'8%',right:'5%',top:5.5,height:1.4,borderRadius:1,backgroundColor:color,opacity:0.28,transform:[{rotate:(0.5+r(4)*0.6)+'deg'}]}}/>
+  </View>;
+}
