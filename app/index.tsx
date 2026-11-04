@@ -1,5 +1,5 @@
 import React,{useCallback,useRef,useState} from 'react';
-import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar,Dimensions,Animated} from 'react-native';
+import {View,Text,ScrollView,Pressable,StyleSheet,AppState,StatusBar,Dimensions,Animated,TextStyle} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,deleteTask} from '../src/store';
@@ -15,6 +15,19 @@ const categoryColors:Record<'dark'|'softLight',Record<TaskCategory,{text:string;
 };
 const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
 const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+function TaskTitle({title,completed,colors,style}:{title:string;completed:boolean;colors:ThemeColors;style?:TextStyle}){
+  const progress=useRef(new Animated.Value(completed?0:1)).current;
+  const [width,setWidth]=useState(0);
+  React.useEffect(()=>{
+    const animation=Animated.timing(progress,{toValue:completed?1:0,duration:250,useNativeDriver:false});
+    animation.start();
+    return()=>animation.stop();
+  },[completed,progress]);
+  return <View style={{alignSelf:'flex-start',maxWidth:'100%'}}>
+    <Text onLayout={event=>setWidth(event.nativeEvent.layout.width)} style={[{color:completed?colors.muted:colors.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3,opacity:completed?0.82:1},style]}>{title}</Text>
+    {completed&&width>0?<Animated.View pointerEvents="none" style={{position:'absolute',left:0,top:'50%',height:2.5,borderRadius:2,backgroundColor:colors.accent,width:progress.interpolate({inputRange:[0,1],outputRange:[0,width]})}}/>:null}
+  </View>;
+}
 const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'];
 export default function Home(){
   const {colors:c,appearance}=useAppTheme();
@@ -76,7 +89,7 @@ export default function Home(){
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
       <View style={{flex:1,gap:7}}>
-        <Text style={[s.taskTitle,late?{color:appearance==='dark'?'#FFB5A9':'#A82F27',fontWeight:'900'}:undefined,!!t.completed?s.completed:undefined]}>{t.title}</Text>
+        <TaskTitle key={`${t.id}-${t.completed}`} title={t.title} completed={!!t.completed} colors={c} style={late?{color:appearance==='dark'?'#FFB5A9':'#A82F27',fontWeight:'900'}:undefined}/>
         {t.description?.trim()?<Text style={s.taskDescription} numberOfLines={2}>{t.description.trim()}</Text>:null}
         <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{formatDate(t.due_at)}</Text></View>
       </View>
@@ -84,7 +97,6 @@ export default function Home(){
         {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:7,paddingVertical:5,borderRadius:5}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
         <View style={[s.priorityLine,{backgroundColor:late?(appearance==='dark'?'#FF887B':'#B83931'):({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[t.priority]}]}/>
       </View>
-      {t.completed?<Strike seed={t.id} color={c.text}/>:null}
     </Pressable>;
   }
   const empty=(message:string)=><Text style={s.empty}>{message}</Text>;
@@ -175,7 +187,7 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   task:{paddingVertical:19,flexDirection:'row',alignItems:'center',gap:14,borderBottomWidth:1,borderBottomColor:c.border},
   check:{width:27,height:27,borderRadius:6,borderWidth:2,borderColor:c.muted,alignItems:'center',justifyContent:'center'},
   checked:{backgroundColor:c.accent,borderColor:c.accent},checkText:{color:c.background,fontWeight:'900',fontSize:16},
-  taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},completed:{color:c.muted},
+  taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},
   taskDescription:{color:c.muted,fontSize:13,lineHeight:18},
   meta:{color:c.muted,fontSize:11},late:{color:c.danger,fontSize:10,fontWeight:'900',letterSpacing:0.8},
   priority:{color:c.muted,fontSize:9,fontWeight:'800'},
@@ -189,23 +201,3 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   navActive:{color:c.accent},dot:{width:16,height:3,borderRadius:3,backgroundColor:c.accent},
 });
 
-/**
- * Risco de "feito" com cara de caneta: três trechos com inclinações levemente
- * diferentes e uma segunda passada mais fraca. O seed (id da tarefa) varia os
- * ângulos para que os riscos não fiquem todos idênticos.
- */
-function Strike({seed,color}:{seed:number;color:string}){
-  const r=(n:number)=>{const x=Math.sin(seed*12.9898+n*78.233)*43758.5453;return x-Math.floor(x);};
-  const a=-1.6+r(1)*1.2, b=-0.3+r(2)*1.1, d=-1.4+r(3)*1.4;
-  const segment=(flex:number,deg:number,dy:number,radius:object)=>(
-    <View style={{flex,height:2.6,marginHorizontal:-1,backgroundColor:color,opacity:0.62,transform:[{translateY:dy},{rotate:deg+'deg'}],...radius}}/>
-  );
-  return <View pointerEvents="none" style={{position:'absolute',left:-4,right:-6,top:'50%',height:10,marginTop:-5}}>
-    <View style={{flexDirection:'row',alignItems:'center',height:10}}>
-      {segment(0.34,a,0.4,{borderTopLeftRadius:2,borderBottomLeftRadius:2})}
-      {segment(0.41,b,-0.3,{})}
-      {segment(0.25,d,0.5,{borderTopRightRadius:2,borderBottomRightRadius:2})}
-    </View>
-    <View style={{position:'absolute',left:'8%',right:'5%',top:5.5,height:1.4,borderRadius:1,backgroundColor:color,opacity:0.28,transform:[{rotate:(0.5+r(4)*0.6)+'deg'}]}}/>
-  </View>;
-}
