@@ -39,8 +39,8 @@ const ready=(async()=>{
 })();
 export async function initDB(){await ready;}
 async function refreshWidget(){try{const {Platform}=await import('react-native');if(Platform.OS==='android')await (await import('./widget/sync')).refreshPingWidget();}catch(e){console.warn('[widget] Refresh failed:',e);}}
-export async function listTasks(){await syncDailyTasks();const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) ORDER BY completed ASC,due_at ASC');}
-export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){await syncDailyTasks();const db=await ready;return category?db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) AND category=? ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?',category,limit,offset):db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?',limit,offset);}
+export async function listTasks(){await syncDailyTasks();const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM tasks WHERE daily=1 AND daily_active<>1)) ORDER BY completed ASC,due_at ASC');}
+export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){await syncDailyTasks();const db=await ready;return category?db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM tasks WHERE daily=1 AND daily_active<>1)) AND category=? ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?',category,limit,offset):db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?',limit,offset);}
 export async function listArchivedTasks(limit=50,offset=0){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NOT NULL ORDER BY archived_at DESC LIMIT ? OFFSET ?',limit,offset);}
 export async function archiveTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=? WHERE (id=? OR parent_id=?) AND completed=1',Date.now(),id,id);await refreshWidget();}
 export async function restoreArchivedTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=NULL WHERE id=? OR parent_id=?',id,id);await refreshWidget();}
@@ -71,9 +71,13 @@ async function replaceReminders(id:number,task:TaskInput,completed:boolean){
 }
 export async function listChildren(parentId:number){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id=? ORDER BY id ASC',parentId);}
 export async function saveTaskGroup(task:TaskInput,children:string[],id?:number,daily=false){
-  const parent=await saveTask(task,id);
   const db=await ready;
-  await db.runAsync('UPDATE tasks SET daily=?,daily_active=1,daily_day=? WHERE id=?',daily?1:0,daily?localDay():null,parent.id);
+  if(id!==undefined)await db.runAsync('UPDATE tasks SET daily=?,daily_active=1,daily_day=? WHERE id=?',daily?1:0,daily?localDay():null,id);
+  const parent=await saveTask(task,id);
+  if(id===undefined){
+    await db.runAsync('UPDATE tasks SET daily=?,daily_active=1,daily_day=? WHERE id=?',daily?1:0,daily?localDay():null,parent.id);
+    if(daily)await replaceReminders(parent.id,task,false);
+  }
   const existing=id?await listChildren(parent.id):[];
   const clean=children.map(x=>x.trim()).filter(Boolean);
   for(let i=0;i<clean.length;i++){
