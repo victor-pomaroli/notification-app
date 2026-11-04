@@ -42,9 +42,14 @@ async function buildContent(task:ReminderTask,stage:ReminderStage,variant:number
     categoryIdentifier:TASK_CATEGORY,
   };
 }
-function dateTrigger(at:number):Notifications.NotificationTriggerInput{
+/**
+ * `alarmClock` usa AlarmManager.setAlarmClock(): o Android nunca atrasa (nem em Doze nem por
+ * economia de bateria do fabricante), mas mostra o ícone de despertador na barra de status
+ * até disparar. Por isso só o aviso do horário da tarefa usa esse modo.
+ */
+function dateTrigger(at:number,delivery:Notifications.NotificationDelivery='bestEffort'):Notifications.NotificationTriggerInput{
   return {type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(at),
-    ...(Platform.OS==='android'?{channelId:CHANNEL}:{})};
+    ...(Platform.OS==='android'?{channelId:CHANNEL,delivery}:{})};
 }
 
 export async function scheduleTaskReminders(task:ReminderTask):Promise<ScheduledReminder[]>{
@@ -60,7 +65,7 @@ export async function scheduleTaskReminders(task:ReminderTask):Promise<Scheduled
       if(at<=Date.now())continue;
       const id=await Notifications.scheduleNotificationAsync({
         content:await buildContent(task,stage as ReminderStage,task.id+stage),
-        trigger:dateTrigger(at),
+        trigger:dateTrigger(at,stage===0?'alarmClock':'bestEffort'),
       });
       result.push({notification_id:id,stage,scheduled_at:at});
     }
