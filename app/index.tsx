@@ -7,6 +7,7 @@ import {categories,TaskCategory} from '../src/templates';
 import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 import {CalendarScreen} from '../src/components/CalendarScreen';
+import {SummaryNote} from '../src/components/SummaryNote';
 
 type Tab='home'|'tasks'|'calendar';
 const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
@@ -76,8 +77,12 @@ export default function Home(){
   const pending=roots.filter(t=>!t.completed);
   // Tarefas sem data nunca ficam atrasadas nem contam como "pra hoje"; aparecem no radar.
   const overdue=pending.filter(t=>!t.daily&&!t.no_due&&t.due_at<now);
-  const upcoming=pending.filter(t=>t.daily||t.no_due||t.due_at>=now);
+  // Radar = o que ainda vem hoje: rotinas, tarefas sem data e as que vencem mais tarde hoje.
+  // Tarefas de outros dias ficam em Tarefas e no Calendário.
+  const isToday=(ms:number)=>new Date(ms).toDateString()===new Date(now).toDateString();
+  const upcoming=pending.filter(t=>t.daily||t.no_due||(t.due_at>=now&&isToday(t.due_at)));
   const today=pending.filter(t=>t.daily||(!t.no_due&&new Date(t.due_at).toDateString()===new Date(now).toDateString()));
+  const todayAhead=today.filter(t=>!overdue.includes(t));
   const completedToday=roots.filter(t=>!!t.completed&&t.completed_at!=null&&new Date(t.completed_at).toDateString()===new Date(now).toDateString())
     .sort((a,b)=>(b.completed_at??0)-(a.completed_at??0));
   async function toggle(t:Task){
@@ -147,17 +152,11 @@ export default function Home(){
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
       {page==='home'?<Text style={s.heading}>{'Seu dia.\nSem desculpas.'}</Text>:page==='calendar'?<Text style={s.heading}>{'Seu tempo.\nSeu ritmo.'}</Text>:null}
       {page==='home'?<>
-        <View style={s.hero}>
-          <View pointerEvents="none" style={s.postitCornerCut}/>
-          <View pointerEvents="none" style={s.postitFold}/>
-          <Text style={s.heroLabel}>O RESUMO DA ÓPERA</Text>
-          <View style={s.heroNumbers}><Text style={s.heroNumber}>{pending.length.toString().padStart(2,'0')}</Text><View style={s.heroSide}><Text style={s.heroSideBig}>{overdue.length} atrasadas</Text><Text style={s.heroSideSmall}>{today.length} pra hoje</Text></View></View>
-          <Text style={s.heroFooter}>{pending.length===0?'Tudo resolvido. Aproveita esse raro momento.':overdue.length?'Tem coisa te esperando. Você sabe o que fazer.':'Por enquanto, tudo sob controle.'}</Text>
-        </View>
+        <SummaryNote appearance={appearance} page={c.background} left={overdue.length+todayAhead.length} overdue={overdue.length} today={todayAhead.length} done={completedToday.length}/>
         <View style={s.sectionHead}><Text style={s.section}>PASSOU DA HORA</Text><Text style={s.sectionCount}>{String(overdue.length).padStart(2,'0')}</Text></View>
         {overdue.length?groupedCards(tasks.filter(t=>overdue.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada atrasado. Pode comemorar sem exagerar.')}
         <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
-        {upcoming.length?groupedCards(tasks.filter(t=>upcoming.slice(0,8).some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nenhuma tarefa futura. Que paz suspeita.')}
+        {upcoming.length?groupedCards(tasks.filter(t=>upcoming.slice(0,8).some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada mais pra hoje. Que paz suspeita.')}
         <View style={s.sectionHead}><Text style={s.section}>CONCLUÍDAS HOJE</Text><Text style={s.sectionCount}>{String(completedToday.length).padStart(2,'0')}</Text></View>
         {completedToday.length?groupedCards(tasks.filter(t=>completedToday.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada concluído hoje. Ainda dá tempo.')}
       </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks} selected={calendarDay} onSelect={setCalendarDay}/>:<>
@@ -214,14 +213,6 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   settingsIcon:{color:c.accent,fontSize:23,fontWeight:'700'},
   eyebrow:{color:c.accent,fontSize:10,fontWeight:'900',letterSpacing:2.5,marginBottom:13},
   heading:{color:c.text,fontSize:40,fontWeight:'900',lineHeight:43,letterSpacing:-2,marginBottom:22},
-  hero:{backgroundColor:c.accent,borderRadius:4,padding:23,marginBottom:33,transform:[{rotate:'-1deg'}],overflow:'visible',elevation:c.background==='#111310'?3:0,shadowColor:'#000000',shadowOffset:{width:0,height:3},shadowOpacity:c.background==='#111310'?0.12:0,shadowRadius:6},
-  postitCornerCut:{position:'absolute',top:-1,right:-1,width:0,height:0,borderTopWidth:25,borderLeftWidth:25,borderTopColor:c.background,borderLeftColor:'transparent',zIndex:2},
-  postitFold:{position:'absolute',top:0,right:0,width:0,height:0,borderBottomWidth:23,borderRightWidth:23,borderBottomColor:c.background==='#111310'?'#B5D653':'#77964A',borderRightColor:'transparent',zIndex:3,transform:[{translateX:-1},{translateY:1}]},
-  heroLabel:{color:c.background,fontWeight:'900',letterSpacing:2,fontSize:10},
-  heroNumbers:{flexDirection:'row',alignItems:'center',gap:20,marginTop:6},
-  heroNumber:{color:c.background,fontSize:89,fontWeight:'900',letterSpacing:-7},
-  heroSide:{gap:7},heroSideBig:{color:c.background,fontWeight:'900',fontSize:17},heroSideSmall:{color:c.background,fontWeight:'600',fontSize:14},
-  heroFooter:{color:c.background,fontWeight:'700',fontSize:12,marginTop:5,lineHeight:19},
   sectionHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderBottomWidth:1,borderBottomColor:c.border,paddingBottom:12,marginTop:12,marginBottom:5},
   section:{color:c.text,fontSize:12,fontWeight:'900',letterSpacing:1.5},sectionCount:{color:c.accent,fontSize:14,fontWeight:'900'},
   task:{paddingVertical:19,flexDirection:'row',alignItems:'center',gap:14,borderBottomWidth:1,borderBottomColor:c.border},
