@@ -8,7 +8,7 @@ Notifications.setNotificationHandler({
 });
 const CHANNEL='tasks';
 export type ScheduledReminder={notification_id:string;stage:number;scheduled_at:number};
-export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory};
+export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory;daily?:boolean};
 export async function setupNotifications(){
   if(Platform.OS==='android') await Notifications.setNotificationChannelAsync(CHANNEL,{
     name:'Lembretes de tarefas',importance:Notifications.AndroidImportance.HIGH,
@@ -30,6 +30,16 @@ export async function scheduleTaskReminders(task:ReminderTask):Promise<Scheduled
   if(!permission.granted){console.warn('[notifications] Permission not granted');return [];}
   const result:ScheduledReminder[]=[];
   try{
+    if(task.daily){
+      const when=new Date(task.due_at);
+      const hour=when.getHours()>=22||when.getHours()<7?7:when.getHours();
+      const minute=hour===7 && (when.getHours()>=22||when.getHours()<7)?0:when.getMinutes();
+      const id=await Notifications.scheduleNotificationAsync({
+        content:{title:prefs.privatePreviews?'Ping · lembrete':task.title,body:prefs.privatePreviews?'Você tem uma tarefa esperando. Abra o Ping para conferir.':'Sua rotina diária está te esperando no Ping.',data:{kind:'task_due',taskId:task.id,daily:true}},
+        trigger:{type:Notifications.SchedulableTriggerInputTypes.DAILY,hour,minute,...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
+      });
+      return [{notification_id:id,stage:0,scheduled_at:Date.now()}];
+    }
     const offsets=reminderOffsets(task.category);
     const used=new Set<number>();
     for(let stage=0;stage<offsets.length;stage++){
