@@ -192,7 +192,7 @@ export async function syncDailyTasks(){
   await db.runAsync('DELETE FROM daily_history WHERE day<?',localDay(cutoff));
 }
 export async function listRoutines(){
-  const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE daily=1 AND parent_id IS NULL ORDER BY daily_active DESC,id DESC');
+  const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE daily=1 AND daily_active>=0 AND parent_id IS NULL ORDER BY daily_active DESC,id DESC');
 }
 export async function setRoutineActive(id:number,active:boolean){
   const db=await ready;const task=await getTask(id);
@@ -200,6 +200,13 @@ export async function setRoutineActive(id:number,active:boolean){
   await db.runAsync('UPDATE tasks SET daily_active=?,daily_day=? WHERE id=?',active?1:0,active?localDay():task.daily_day,id);
   if(active){await db.runAsync('UPDATE tasks SET completed=0,completed_at=NULL WHERE id=? OR parent_id=?',id,id);}
   await replaceReminders(id,task,false);
+  await refreshWidget();
+}
+export async function endRoutine(id:number){
+  const db=await ready;const task=await getTask(id);
+  if(!task?.daily)return;
+  await db.runAsync('UPDATE tasks SET daily_active=-1 WHERE id=?',id);
+  await replaceReminders(id,task,true);
   await refreshWidget();
 }
 export async function routineHistory(id:number,limit=30){
