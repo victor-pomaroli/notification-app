@@ -6,6 +6,7 @@ import {Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,delete
 import {categories,TaskCategory} from '../src/templates';
 import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
+import {CalendarScreen} from '../src/components/CalendarScreen';
 
 type Tab='home'|'tasks'|'calendar';
 const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
@@ -130,7 +131,7 @@ export default function Home(){
 
       <>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
-      {page==='home'?<Text style={s.heading}>{'Seu dia.\nSem desculpas.'}</Text>:page==='calendar'?<Text style={s.heading}>Calendário.</Text>:null}
+      {page==='home'?<Text style={s.heading}>{'Seu dia.\nSem desculpas.'}</Text>:page==='calendar'?<Text style={s.heading}>{'Seu tempo.\nSeu ritmo.'}</Text>:null}
       {page==='home'?<>
         <View style={s.hero}>
           <View pointerEvents="none" style={s.postitCornerCut}/>
@@ -145,12 +146,7 @@ export default function Home(){
         {upcoming.length?groupedCards(tasks.filter(t=>upcoming.slice(0,8).some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nenhuma tarefa futura. Que paz suspeita.')}
         <View style={s.sectionHead}><Text style={s.section}>CONCLUÍDAS HOJE</Text><Text style={s.sectionCount}>{String(completedToday.length).padStart(2,'0')}</Text></View>
         {completedToday.length?groupedCards(tasks.filter(t=>completedToday.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada concluído hoje. Ainda dá tempo.')}
-      </>:page==='calendar'?<>
-        <View style={s.soonCard}>
-          <Text style={s.soonBadge}>EM BREVE</Text>
-          <Text style={s.soonTitle}>O calendário está a caminho.</Text>
-        </View>
-      </>:<>
+      </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks}/>:<>
         <View style={s.tasksHead}>
           <Text style={s.section}>TODAS AS TAREFAS</Text>
           <Text style={[s.sectionCount,{marginLeft:9}]}>{String(filteredTasks.length).padStart(2,'0')}</Text>
@@ -229,14 +225,11 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   routinesLink:{marginLeft:'auto',borderWidth:1,borderColor:c.border,borderRadius:999,paddingHorizontal:11,paddingVertical:6},
   routinesLinkText:{color:c.accent,fontSize:11,fontWeight:'900',letterSpacing:0.8},
   filters:{borderBottomWidth:1,borderBottomColor:c.border,paddingBottom:12,marginBottom:5},
-  soonCard:{backgroundColor:c.surface,borderWidth:1,borderColor:c.border,borderRadius:12,padding:22,marginTop:6},
-  soonBadge:{alignSelf:'flex-start',color:c.background,backgroundColor:c.accent,fontSize:10,fontWeight:'900',letterSpacing:1.5,paddingHorizontal:8,paddingVertical:4,borderRadius:5,overflow:'hidden'},
-  soonTitle:{color:c.text,fontSize:17,fontWeight:'800',marginTop:12},
   tip:{color:c.muted,fontSize:9,letterSpacing:1.1,marginTop:35,textAlign:'center'},
   add:{position:'absolute',bottom:91,right:23,backgroundColor:c.accent,height:61,width:61,borderRadius:12,alignItems:'center',justifyContent:'center',elevation:7},
   plus:{color:c.background,fontSize:38,fontWeight:'500',lineHeight:47},
   nav:{height:75,backgroundColor:c.surface,flexDirection:'row',borderTopWidth:1,borderTopColor:c.border,paddingHorizontal:12},
-  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navSelected:{},navText:{color:c.muted,fontSize:10,fontWeight:'900',letterSpacing:1.4},
+  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navSelected:{},navText:{color:c.muted,fontSize:9,fontWeight:'900',letterSpacing:0.7},
   navActive:{color:c.accent},dot:{width:16,height:3,borderRadius:3,backgroundColor:c.accent},
 });
 
