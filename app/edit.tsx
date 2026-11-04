@@ -5,10 +5,10 @@ import {getTask,saveTaskGroup,listChildren,ChildInput} from '../src/store';
 import * as Notifications from 'expo-notifications';
 import {getPreferences} from '../src/preferences';
 import {categories,TaskCategory} from '../src/templates';
-import {useAppTheme,ThemeColors} from '../src/theme';
+import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 export default function Edit(){
-  const {colors:c}=useAppTheme();
+  const {colors:c,appearance}=useAppTheme();
   const s=React.useMemo(()=>createStyles(c),[c]);
   const {id}=useLocalSearchParams<{id?:string}>();
   const router=useRouter();
@@ -19,6 +19,8 @@ export default function Edit(){
   const [category,setCategory]=useState<TaskCategory>('general');
   const [completed,setCompleted]=useState(false);
   const [daily,setDaily]=useState(false);
+  // "Quando?" é opcional: sem data a tarefa não agenda notificações.
+  const [hasDue,setHasDue]=useState(true);
   const [picker,setPicker]=useState<'date'|'time'|null>(null);
   const [month,setMonth]=useState(new Date());
   const [hour,setHour]=useState('00');
@@ -39,18 +41,18 @@ export default function Edit(){
   }
   const [saving,setSaving]=useState(false);
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
-  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>({id:row.id,title:row.title})))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);setDaily(!!t.daily);}}).catch(console.warn);},[id]);
+  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>({id:row.id,title:row.title})))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);setDaily(!!t.daily);setHasDue(!t.no_due);}}).catch(console.warn);},[id]);
   async function save(){
     if(!title.trim()){setFeedback({title:'Faltou o principal.',message:'Dá um nome para essa tarefa antes de continuar.'});return;}
     if(saving)return;
     setSaving(true);
     try{
-      const result=await saveTaskGroup({title:title.trim(),description:'',due_at:due.getTime(),priority,category},children,id?Number(id):undefined,daily);
+      const result=await saveTaskGroup({title:title.trim(),description:'',due_at:hasDue?due.getTime():Date.now(),priority,category,no_due:hasDue?0:1},children,id?Number(id):undefined,daily);
       const prefs=await getPreferences().catch(()=>null);
-      const permission=prefs?.notifications?await Notifications.getPermissionsAsync().catch(()=>null):null;
+      const permission=prefs?.notifications&&hasDue?await Notifications.getPermissionsAsync().catch(()=>null):null;
       router.back();
       if(result.reminderError)Alert.alert('Tarefa salva','Não foi possível agendar o lembrete. Confira as notificações em Ajustes.');
-      else if(prefs?.notifications&&!permission?.granted)Alert.alert('Tarefa salva','As notificações não estão permitidas no Android. Ative a permissão em Ajustes para receber lembretes.');
+      else if(prefs?.notifications&&hasDue&&!permission?.granted)Alert.alert('Tarefa salva','As notificações não estão permitidas no Android. Ative a permissão em Ajustes para receber lembretes.');
     }catch(e){setFeedback({title:'Não deu para salvar.',message:String(e)});}
     finally{setSaving(false);}
   }
@@ -75,26 +77,34 @@ export default function Edit(){
       </Pressable>
     </View>
     <Text style={s.helper}>A primeira tarefa é a principal. Concluí-la também conclui todas as etapas associadas.</Text>
-    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:daily}} onPress={()=>setDaily(value=>!value)} style={{flexDirection:'row',alignItems:'center',gap:13,backgroundColor:c.surface,borderColor:daily?c.accent:c.border,borderWidth:1,borderRadius:10,padding:16,marginTop:22}}>
+    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:daily}} onPress={()=>setDaily(value=>{if(!value)setHasDue(true);return !value;})} style={{flexDirection:'row',alignItems:'center',gap:13,backgroundColor:c.surface,borderColor:daily?c.accent:c.border,borderWidth:1,borderRadius:10,padding:16,marginTop:22}}>
       <View style={{width:24,height:24,borderWidth:2,borderRadius:6,borderColor:daily?c.accent:c.muted,backgroundColor:daily?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}><Text style={{color:c.background,fontWeight:'900'}}>{daily?'✓':''}</Text></View>
       <View style={{flex:1}}><Text style={{color:c.text,fontSize:15,fontWeight:'800'}}>Tarefa diária ↻</Text><Text style={{color:c.muted,fontSize:12,marginTop:3}}>Repetir todos os dias no mesmo horário</Text></View>
     </Pressable>
-    <Text style={s.label}>03 / QUANDO?</Text>
-    <View style={s.scheduleCard}>
-      <Pressable style={s.scheduleRow} onPress={()=>openPicker('date')}>
-        <Text style={s.scheduleSymbol}>▦</Text>
-        <View style={{flex:1}}><Text style={s.scheduleCaption}>DATA DO LEMBRETE</Text><Text style={s.scheduleValue}>{due.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</Text></View>
-        <Text style={s.scheduleArrow}>›</Text>
-      </Pressable>
-      <View style={s.scheduleDivider}/>
-      <Pressable style={s.scheduleRow} onPress={()=>openPicker('time')}>
-        <Text style={s.scheduleSymbol}>◷</Text>
-        <View style={{flex:1}}><Text style={s.scheduleCaption}>HORÁRIO</Text><Text style={s.scheduleValue}>{due.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</Text></View>
-        <Text style={s.scheduleArrow}>›</Text>
-      </Pressable>
-    </View>
-    <Text style={s.scheduleCaptionQuick}>ATALHOS RÁPIDOS</Text>
-    <View style={s.row}>{([{label:'Hoje',days:0},{label:'Amanhã',days:1},{label:'+7 dias',days:7}] as const).map(item=><Pressable key={item.label} style={s.quickChip} onPress={()=>{const next=new Date();next.setDate(next.getDate()+item.days);next.setHours(due.getHours(),due.getMinutes(),0,0);setDue(next);}}><Text style={s.quickText}>{item.label}</Text></Pressable>)}</View>
+    <Text style={s.label}>03 / QUANDO? <Text style={s.labelOptional}>(OPCIONAL)</Text></Text>
+    <View style={[s.row,{marginBottom:12}]}>{([{value:true,label:'Com data'},{value:false,label:'Sem data'}] as const).map(item=>{
+      const active=hasDue===item.value,blocked=!item.value&&daily;
+      return <Pressable key={item.label} accessibilityRole="radio" accessibilityState={{selected:active,disabled:blocked}} disabled={blocked} onPress={()=>setHasDue(item.value)} style={[s.choice,active&&s.selected,blocked&&{opacity:0.4}]}>
+        <Text style={[s.choiceText,active&&s.selectedText]}>{item.label}</Text>
+      </Pressable>;
+    })}</View>
+    {hasDue?<>
+      <View style={s.scheduleCard}>
+        <Pressable style={s.scheduleRow} onPress={()=>openPicker('date')}>
+          <Text style={s.scheduleSymbol}>▦</Text>
+          <View style={{flex:1}}><Text style={s.scheduleCaption}>DATA DO LEMBRETE</Text><Text style={s.scheduleValue}>{due.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</Text></View>
+          <Text style={s.scheduleArrow}>›</Text>
+        </Pressable>
+        <View style={s.scheduleDivider}/>
+        <Pressable style={s.scheduleRow} onPress={()=>openPicker('time')}>
+          <Text style={s.scheduleSymbol}>◷</Text>
+          <View style={{flex:1}}><Text style={s.scheduleCaption}>HORÁRIO</Text><Text style={s.scheduleValue}>{due.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</Text></View>
+          <Text style={s.scheduleArrow}>›</Text>
+        </Pressable>
+      </View>
+      <Text style={s.scheduleCaptionQuick}>ATALHOS RÁPIDOS</Text>
+      <View style={s.row}>{([{label:'Hoje',days:0},{label:'Amanhã',days:1},{label:'+7 dias',days:7}] as const).map(item=><Pressable key={item.label} style={s.quickChip} onPress={()=>{const next=new Date();next.setDate(next.getDate()+item.days);next.setHours(due.getHours(),due.getMinutes(),0,0);setDue(next);}}><Text style={s.quickText}>{item.label}</Text></Pressable>)}</View>
+    </>:null}
     <Modal visible={picker!==null} transparent animationType="fade" onRequestClose={()=>setPicker(null)}>
       <View style={s.modalOverlay}><View style={s.modalCard}>
         <Text style={s.modalTitle}>{picker==='date'?'ESCOLHA O DIA':'ESCOLHA A HORA'}</Text>
@@ -123,15 +133,15 @@ export default function Edit(){
         <Pressable style={s.modalCancel} onPress={()=>setPicker(null)}><Text style={s.choiceText}>CANCELAR</Text></Pressable>
       </View></View>
     </Modal>
-    <Text style={s.helper}>{daily?'Uma notificação por dia, no horário escolhido. Silêncio entre 22h e 7h.':'Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.'}</Text>
+    <Text style={s.helper}>{!hasDue?'Sem data, sem notificação. A tarefa fica na sua lista até você concluir.':daily?'Uma notificação por dia, no horário escolhido. Silêncio entre 22h e 7h.':'Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.'}</Text>
     <Text style={s.label}>04 / QUAL O ASSUNTO?</Text>
-    <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=><Pressable key={key} style={[s.choice,{flexBasis:'29%'},category===key&&s.selected]} onPress={()=>setCategory(key)}><Text style={[s.choiceText,category===key&&s.selectedText]}>{({study:'📚',work:'💼',finance:'💸',home:'🏠',health:'💚',general:'✨'} as const)[key]} {categories[key]}</Text></Pressable>)}</View>
+    <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=>{const topic=categoryColors[appearance][key];const active=category===key;return <Pressable key={key} accessibilityRole="radio" accessibilityState={{selected:active}} style={[s.choice,{flexBasis:'29%'},active&&{backgroundColor:topic.surface,borderColor:topic.text}]} onPress={()=>setCategory(key)}><Text style={[s.choiceText,{color:topic.text},active&&{fontWeight:'900'}]}>{categories[key]}</Text></Pressable>;})}</View>
     <Text style={s.label}>05 / QUAL A URGÊNCIA?</Text>
     <View style={s.row}>{(['low','medium','high'] as const).map((p,i)=>{
-      const color=({low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const)[p];
-      return <Pressable key={p} style={[s.choice,priority===p&&{borderColor:c.muted}]} onPress={()=>setPriority(p)}>
+      const color=priorityColors[p];
+      return <Pressable key={p} style={[s.choice,priority===p&&{borderColor:color,backgroundColor:c.surfaceRaised}]} onPress={()=>setPriority(p)}>
         <Text style={s.choiceText}>{['Baixa','Média','Alta'][i]}</Text>
-        <View style={[s.urgencyLine,{backgroundColor:color,opacity:priority===p?1:0.55,width:priority===p?38:25}]}/>
+        <View style={[s.urgencyLine,{backgroundColor:color,opacity:priority===p?1:0.75,width:priority===p?46:32}]}/>
       </Pressable>;
     })}</View>
     {completed?<Text style={s.helper}>Esta tarefa já está concluída. Não será agendada uma nova notificação.</Text>:null}
@@ -143,12 +153,13 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   kicker:{color:c.accent,fontWeight:'900',fontSize:10,letterSpacing:2.5,marginBottom:15},
   heading:{color:c.text,fontSize:47,fontWeight:'900',lineHeight:49,letterSpacing:-2,marginBottom:8},
   subtitle:{color:c.muted,fontSize:14,marginBottom:22},
+  labelOptional:{color:c.muted,fontWeight:'800'},
   label:{color:c.accent,fontWeight:'900',marginBottom:12,marginTop:27,fontSize:10,letterSpacing:1.5},
   input:{backgroundColor:c.surface,color:c.text,padding:17,borderRadius:8,fontSize:16,borderWidth:1,borderColor:c.border},
   row:{flexDirection:'row',gap:8},
   choice:{backgroundColor:c.surface,paddingVertical:15,paddingHorizontal:10,borderRadius:7,flex:1,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:c.border},
   choiceText:{color:c.text,fontWeight:'700',fontSize:12},
-  urgencyLine:{height:3,borderRadius:3,marginTop:8},
+  urgencyLine:{height:5,borderRadius:3,marginTop:9},
   selected:{backgroundColor:c.accentSoft,borderColor:c.accent},selectedText:{color:c.accent},
   helper:{color:c.muted,fontSize:12,marginTop:12,lineHeight:19},
   button:{backgroundColor:c.accent,alignItems:'center',padding:20,borderRadius:8,marginTop:32},

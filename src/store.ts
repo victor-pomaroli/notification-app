@@ -3,8 +3,9 @@ import {getPreferences} from './preferences';
 import {reminderOffsets} from './templates';
 import {TaskCategory} from './templates';
 import {SNOOZE_STAGE,cancelTaskReminders,scheduleTaskReminders,scheduleSnoozeReminder,dismissTaskNotifications,dismissAllTaskNotifications,ScheduledReminder} from './notifications';
-export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;completed_at:number|null;archived_at:number|null;notification_id:string|null;parent_id:number|null;daily:number;daily_active:number;daily_day:string|null};
-export type TaskInput=Pick<Task,'title'|'description'|'due_at'|'priority'|'category'>;
+export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;completed_at:number|null;archived_at:number|null;notification_id:string|null;parent_id:number|null;daily:number;daily_active:number;daily_day:string|null;no_due:number};
+/** `no_due`: 1 = tarefa sem data ("quando?" opcional), não agenda lembretes. */
+export type TaskInput=Pick<Task,'title'|'description'|'due_at'|'priority'|'category'>&{no_due?:number};
 export type ChildInput={id?:number;title:string};
 const dbPromise=SQLite.openDatabaseAsync('tasks.db');
 const ready=(async()=>{
@@ -29,6 +30,7 @@ const ready=(async()=>{
   if(!cols.some(c=>c.name==='daily'))await db.execAsync('ALTER TABLE tasks ADD COLUMN daily INTEGER NOT NULL DEFAULT 0');
   if(!cols.some(c=>c.name==='daily_active'))await db.execAsync('ALTER TABLE tasks ADD COLUMN daily_active INTEGER NOT NULL DEFAULT 1');
   if(!cols.some(c=>c.name==='daily_day'))await db.execAsync('ALTER TABLE tasks ADD COLUMN daily_day TEXT');
+  if(!cols.some(c=>c.name==='no_due'))await db.execAsync('ALTER TABLE tasks ADD COLUMN no_due INTEGER NOT NULL DEFAULT 0');
   await db.execAsync('CREATE TABLE IF NOT EXISTS daily_history(task_id INTEGER NOT NULL,day TEXT NOT NULL,completed INTEGER NOT NULL,PRIMARY KEY(task_id,day))');
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id)');
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(completed,due_at)');
@@ -40,14 +42,14 @@ const ready=(async()=>{
 })();
 export async function initDB(){await ready;}
 async function refreshWidget(){try{const {Platform}=await import('react-native');if(Platform.OS==='android')await (await import('./widget/sync')).refreshPingWidget();}catch(e){console.warn('[widget] Refresh failed:',e);}}
-export async function listTasks(){await syncDailyTasks();const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM tasks WHERE daily=1 AND daily_active<>1)) ORDER BY completed ASC,due_at ASC');}
+export async function listTasks(){await syncDailyTasks();const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM tasks WHERE daily=1 AND daily_active<>1)) ORDER BY completed ASC,no_due ASC,due_at ASC');}
 // Page by root tasks, then fetch all children of those roots in the same result.
 export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){
   await syncDailyTasks();
   const db=await ready;
   const roots=category
-    ?await db.getAllAsync<Task>("SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND category=? ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?",category,limit,offset)
-    :await db.getAllAsync<Task>("SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?",limit,offset);
+    ?await db.getAllAsync<Task>("SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND category=? ORDER BY completed ASC,no_due ASC,due_at ASC,id ASC LIMIT ? OFFSET ?",category,limit,offset)
+    :await db.getAllAsync<Task>("SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) ORDER BY completed ASC,no_due ASC,due_at ASC,id ASC LIMIT ? OFFSET ?",limit,offset);
   if(!roots.length)return [];
   const ids=roots.map(root=>root.id);
   const children=await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IN (${ids.map(()=>'?').join(',')}) AND archived_at IS NULL ORDER BY id ASC`,...ids);
@@ -65,7 +67,7 @@ export async function listWidgetTasks(){
   const db=await ready;const startOfDay=new Date();startOfDay.setHours(0,0,0,0);
   const visible='parent_id IS NULL AND (daily=0 OR daily_active=1) AND archived_at IS NULL';
   const [pending,done]=await Promise.all([
-    db.getAllAsync<Task>(`SELECT * FROM tasks WHERE ${visible} AND completed=0 ORDER BY due_at ASC,id ASC LIMIT 5`),
+    db.getAllAsync<Task>(`SELECT * FROM tasks WHERE ${visible} AND completed=0 ORDER BY no_due ASC,due_at ASC,id ASC LIMIT 5`),
     db.getAllAsync<Task>(`SELECT * FROM tasks WHERE ${visible} AND completed=1 AND completed_at>=? ORDER BY completed_at DESC,id DESC LIMIT 5`,startOfDay.getTime()),
   ]);
   return {pending,done};
@@ -84,7 +86,7 @@ async function replaceReminders(id:number,task:TaskInput,completed:boolean){
   await db.runAsync('DELETE FROM task_notifications WHERE task_id=?',id);
   await db.runAsync('UPDATE tasks SET notification_id=NULL WHERE id=?',id);
   const current=await getTask(id);
-  if(current?.parent_id || (current?.daily && !current.daily_active) || (completed && !current?.daily))return;
+  if(current?.parent_id || current?.no_due || (current?.daily && !current.daily_active) || (completed && !current?.daily))return;
   const scheduled=await scheduleTaskReminders({id,title:task.title,due_at:task.due_at,category:task.category,daily:!!current?.daily});
   try{
     for(const item of scheduled)await db.runAsync(
@@ -132,11 +134,11 @@ export async function saveTask(task:TaskInput,id?:number){
   const db=await ready;
   let taskId=id;
   if(id!==undefined){
-    await db.runAsync('UPDATE tasks SET title=?,description=?,due_at=?,priority=?,category=? WHERE id=?',
-      task.title,task.description,task.due_at,task.priority,task.category,id);
+    await db.runAsync('UPDATE tasks SET title=?,description=?,due_at=?,priority=?,category=?,no_due=? WHERE id=?',
+      task.title,task.description,task.due_at,task.priority,task.category,task.no_due?1:0,id);
   }else{
-    const result=await db.runAsync('INSERT INTO tasks(title,description,due_at,priority,category) VALUES(?,?,?,?,?)',
-      task.title,task.description,task.due_at,task.priority,task.category);
+    const result=await db.runAsync('INSERT INTO tasks(title,description,due_at,priority,category,no_due) VALUES(?,?,?,?,?,?)',
+      task.title,task.description,task.due_at,task.priority,task.category,task.no_due?1:0);
     taskId=result.lastInsertRowId;
   }
   const current=await getTask(taskId!);
@@ -206,7 +208,7 @@ export async function reconcileReminders(){
   }
   const pending=await (await import('expo-notifications')).getAllScheduledNotificationsAsync();
   const available=new Set(pending.map(n=>n.identifier));
-  const tasks=await (await ready).getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND (completed=0 OR daily=1) AND (daily=0 OR daily_active=1) AND archived_at IS NULL ORDER BY due_at ASC');
+  const tasks=await (await ready).getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND no_due=0 AND (completed=0 OR daily=1) AND (daily=0 OR daily_active=1) AND archived_at IS NULL ORDER BY due_at ASC');
   const notificationRows=await db.getAllAsync<{task_id:number;notification_id:string;scheduled_at:number}>('SELECT task_id,notification_id,scheduled_at FROM task_notifications');
   const byTask=new Map<number,typeof notificationRows>();
   for(const row of notificationRows){const group=byTask.get(row.task_id)??[];group.push(row);byTask.set(row.task_id,group);}
@@ -230,7 +232,7 @@ export async function reconcileReminders(){
 export async function rescheduleAllReminders(){
   await syncDailyTasks();
   const db=await ready;
-  const tasks=await db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND (completed=0 OR daily=1) AND (daily=0 OR daily_active=1) AND archived_at IS NULL ORDER BY due_at ASC');
+  const tasks=await db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND no_due=0 AND (completed=0 OR daily=1) AND (daily=0 OR daily_active=1) AND archived_at IS NULL ORDER BY due_at ASC');
   for(const task of tasks)await replaceReminders(task.id,task,!!task.completed);
 }
 export async function deleteAllTasks(){

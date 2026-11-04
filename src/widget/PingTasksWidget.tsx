@@ -6,7 +6,7 @@ import {categories} from '../templates';
 const palette={background:'#111310',surface:'#1C201A',text:'#F4F1E7',muted:'#A4AA9A',accent:'#D7FC65',danger:'#FF887B',divider:'#353C30'} as const;
 export const COMPLETE_ACTION='COMPLETE_TASK';
 export const UNCOMPLETE_ACTION='UNCOMPLETE_TASK';
-export type WidgetTask=Pick<Task,'id'|'title'|'due_at'|'category'>;
+export type WidgetTask=Pick<Task,'id'|'title'|'due_at'|'category'>&{no_due?:number};
 
 const TITLE_SIZE=16;
 const META_SIZE=12;
@@ -20,7 +20,8 @@ const DONE_HEAD_H=26;   // rótulo "CONCLUÍDAS HOJE"
 const MAX_TASKS=5;
 
 const pad=(n:number)=>String(n).padStart(2,'0');
-function when(ms:number){
+function when(ms:number,noDue?:number){
+  if(noDue)return 'sem data';
   const d=new Date(ms);const now=new Date();
   const day=(x:Date)=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
   const diff=Math.round((day(d)-day(now))/86400000);
@@ -89,17 +90,17 @@ export function PingTasksWidget({tasks=[],done=[],height}:{tasks?:WidgetTask[];d
       <TextWidget text="Tudo em dia." style={{color:palette.text,fontSize:17,fontWeight:'bold'}} maxLines={1} truncate="END"/>
       {visibleDone.length?null:<TextWidget text="Crie uma tarefa no Ping para começar." style={{color:palette.muted,fontSize:13,marginTop:4}} maxLines={2} truncate="END"/>}
     </FlexWidget>:visible.map((task,i)=>{
-      const late=task.due_at<now;
+      const late=!task.no_due&&task.due_at<now;
       return <FlexWidget key={task.id} {...rowLink(task)} style={{flexDirection:'row',alignItems:'center',width:'match_parent',paddingTop:compact?5:7,paddingBottom:compact?5:7,borderTopWidth:i?1:0,borderColor:palette.divider}}>
         <Checkbox task={task} done={false} late={late}/>
         {compact?<FlexWidget style={{flex:1,flexDirection:'row',alignItems:'center'}}>
           <FlexWidget style={{flex:1}}>
             <TextWidget text={task.title} style={{color:palette.text,fontSize:TITLE_SIZE,fontWeight:'bold'}} maxLines={1} truncate="END"/>
           </FlexWidget>
-          <TextWidget text={when(task.due_at)} style={{color:late?palette.danger:palette.muted,fontSize:META_SIZE,marginLeft:8}} maxLines={1}/>
+          <TextWidget text={when(task.due_at,task.no_due)} style={{color:late?palette.danger:palette.muted,fontSize:META_SIZE,marginLeft:8}} maxLines={1}/>
         </FlexWidget>:<FlexWidget style={{flex:1,flexDirection:'column'}}>
           <TextWidget text={task.title} style={{color:palette.text,fontSize:TITLE_SIZE,fontWeight:'bold'}} maxLines={1} truncate="END"/>
-          <TextWidget text={`${categories[task.category]??'Geral'} · ${when(task.due_at)}`} style={{color:late?palette.danger:palette.muted,fontSize:META_SIZE,marginTop:3}} maxLines={1} truncate="END"/>
+          <TextWidget text={`${categories[task.category]??'Geral'} · ${when(task.due_at,task.no_due)}`} style={{color:late?palette.danger:palette.muted,fontSize:META_SIZE,marginTop:3}} maxLines={1} truncate="END"/>
         </FlexWidget>}
       </FlexWidget>;
     })}
