@@ -10,7 +10,7 @@ export default function SettingsPage(){
   const router=useRouter();
   const insets=useSafeAreaInsets();
   return <ScrollView style={{flex:1,backgroundColor:c.background}} contentContainerStyle={{paddingHorizontal:23,paddingTop:20,paddingBottom:insets.bottom+50}}>
-    <SettingsScreen/>
+    <SettingsScreen onDataDeleted={()=>router.back()}/>
     <Pressable accessibilityRole="button" onPress={()=>router.push('/archive')} style={{marginTop:22,padding:17,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.border}}>
       <Text style={{color:c.accent,fontWeight:'900'}}>HISTÓRICO DE TAREFAS ARQUIVADAS →</Text>
       <Text style={{color:c.muted,fontSize:12,marginTop:6}}>Consulte e restaure tarefas concluídas há mais de 30 dias.</Text>
