@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {Text,TextInput,Pressable,ScrollView,StyleSheet,View,Modal,Alert} from 'react-native';
 import {useLocalSearchParams,useRouter} from 'expo-router';
-import {getTask,saveTask} from '../src/store';
+import {getTask,saveTaskGroup,listChildren,ChildInput} from '../src/store';
 import * as Notifications from 'expo-notifications';
 import {getPreferences} from '../src/preferences';
 import {categories,TaskCategory} from '../src/templates';
@@ -13,11 +13,12 @@ export default function Edit(){
   const {id}=useLocalSearchParams<{id?:string}>();
   const router=useRouter();
   const [title,setTitle]=useState('');
-  const [description,setDescription]=useState('');
+  const [children,setChildren]=useState<ChildInput[]>([]);
   const [due,setDue]=useState(new Date(Date.now()+3600000));
   const [priority,setPriority]=useState<'low'|'medium'|'high'>('medium');
   const [category,setCategory]=useState<TaskCategory>('general');
   const [completed,setCompleted]=useState(false);
+  const [daily,setDaily]=useState(false);
   const [picker,setPicker]=useState<'date'|'time'|null>(null);
   const [month,setMonth]=useState(new Date());
   const [hour,setHour]=useState('00');
@@ -38,13 +39,13 @@ export default function Edit(){
   }
   const [saving,setSaving]=useState(false);
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
-  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);setDescription(t.description);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);}}).catch(console.warn);},[id]);
+  useEffect(()=>{if(id)getTask(Number(id)).then(t=>{if(t){setTitle(t.title);listChildren(t.id).then(rows=>setChildren(rows.map(row=>({id:row.id,title:row.title})))).catch(console.warn);setDue(new Date(t.due_at));setPriority(t.priority);setCategory(t.category??'general');setCompleted(!!t.completed);setDaily(!!t.daily);}}).catch(console.warn);},[id]);
   async function save(){
     if(!title.trim()){setFeedback({title:'Faltou o principal.',message:'Dá um nome para essa tarefa antes de continuar.'});return;}
     if(saving)return;
     setSaving(true);
     try{
-      const result=await saveTask({title:title.trim(),description,due_at:due.getTime(),priority,category},id?Number(id):undefined);
+      const result=await saveTaskGroup({title:title.trim(),description:'',due_at:due.getTime(),priority,category},children,id?Number(id):undefined,daily);
       const prefs=await getPreferences().catch(()=>null);
       const permission=prefs?.notifications?await Notifications.getPermissionsAsync().catch(()=>null):null;
       router.back();
@@ -61,8 +62,23 @@ export default function Edit(){
     <Text style={s.subtitle}>Anota agora. A gente te cobra depois.</Text>
     <Text style={s.label}>01 / O QUE PRECISA SER FEITO?</Text>
     <TextInput style={s.input} placeholderTextColor={c.muted} value={title} onChangeText={setTitle} placeholder="Ex.: Entregar relatório" maxLength={120}/>
-    <Text style={s.label}>02 / ALGUM DETALHE?</Text>
-    <TextInput style={[s.input,{height:105,textAlignVertical:'top'}]} placeholderTextColor={c.muted} multiline value={description} onChangeText={setDescription} placeholder="Detalhes opcionais"/>
+    <Text style={s.label}>02 / TAREFAS ASSOCIADAS</Text>
+    <View style={{borderLeftWidth:2,borderLeftColor:c.accent,marginLeft:12,paddingLeft:16,gap:10}}>
+      {children.map((value,index)=><View key={value.id??`new-${index}`} style={{flexDirection:'row',alignItems:'center',gap:8}}>
+        <Text style={{color:c.accent,fontSize:20}}>↳</Text>
+        <TextInput style={[s.input,{flex:1}]} placeholderTextColor={c.muted} placeholder={`Etapa ${index+1}`} value={value.title} onChangeText={text=>setChildren(old=>old.map((item,i)=>i===index?{...item,title:text}:item))} maxLength={120}/>
+        <Pressable accessibilityLabel="Remover tarefa associada" onPress={()=>setChildren(old=>old.filter((_,i)=>i!==index))} style={{padding:9}}><Text style={{color:c.danger,fontSize:20}}>×</Text></Pressable>
+      </View>)}
+      <Pressable accessibilityRole="button" onPress={()=>setChildren(old=>[...old,{title:''}])} style={{borderWidth:1,borderStyle:'dashed',borderColor:c.accent,borderRadius:9,padding:15,flexDirection:'row',alignItems:'center',gap:10,backgroundColor:c.accentSoft}}>
+        <Text style={{color:c.accent,fontSize:24,fontWeight:'900'}}>+</Text>
+        <Text style={{color:c.accent,fontSize:12,fontWeight:'900'}}>ADICIONAR TAREFA À MISSÃO</Text>
+      </Pressable>
+    </View>
+    <Text style={s.helper}>A primeira tarefa é a principal. Concluí-la também conclui todas as etapas associadas.</Text>
+    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:daily}} onPress={()=>setDaily(value=>!value)} style={{flexDirection:'row',alignItems:'center',gap:13,backgroundColor:c.surface,borderColor:daily?c.accent:c.border,borderWidth:1,borderRadius:10,padding:16,marginTop:22}}>
+      <View style={{width:24,height:24,borderWidth:2,borderRadius:6,borderColor:daily?c.accent:c.muted,backgroundColor:daily?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}><Text style={{color:c.background,fontWeight:'900'}}>{daily?'✓':''}</Text></View>
+      <View style={{flex:1}}><Text style={{color:c.text,fontSize:15,fontWeight:'800'}}>Tarefa diária ↻</Text><Text style={{color:c.muted,fontSize:12,marginTop:3}}>Repetir todos os dias no mesmo horário</Text></View>
+    </Pressable>
     <Text style={s.label}>03 / QUANDO?</Text>
     <View style={s.scheduleCard}>
       <Pressable style={s.scheduleRow} onPress={()=>openPicker('date')}>
@@ -107,7 +123,7 @@ export default function Edit(){
         <Pressable style={s.modalCancel} onPress={()=>setPicker(null)}><Text style={s.choiceText}>CANCELAR</Text></Pressable>
       </View></View>
     </Modal>
-    <Text style={s.helper}>Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.</Text>
+    <Text style={s.helper}>{daily?'Uma notificação por dia, no horário escolhido. Silêncio entre 22h e 7h.':'Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.'}</Text>
     <Text style={s.label}>04 / QUAL O ASSUNTO?</Text>
     <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=><Pressable key={key} style={[s.choice,{flexBasis:'29%'},category===key&&s.selected]} onPress={()=>setCategory(key)}><Text style={[s.choiceText,category===key&&s.selectedText]}>{({study:'📚',work:'💼',finance:'💸',home:'🏠',health:'💚',general:'✨'} as const)[key]} {categories[key]}</Text></Pressable>)}</View>
     <Text style={s.label}>05 / QUAL A URGÊNCIA?</Text>

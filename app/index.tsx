@@ -6,9 +6,8 @@ import {Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,delete
 import {categories,TaskCategory} from '../src/templates';
 import {useAppTheme,ThemeColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
-import {SettingsScreen} from '../src/components/SettingsScreen';
 
-type Tab='home'|'tasks'|'alerts'|'settings';
+type Tab='home'|'tasks'|'alerts';
 const categoryColors:Record<'dark'|'softLight',Record<TaskCategory,{text:string;surface:string}>>={
   dark:{study:{text:'#A9B8FF',surface:'#29314A'},work:{text:'#7DDCC7',surface:'#203C35'},finance:{text:'#F7CE7A',surface:'#44371F'},home:{text:'#FFAD91',surface:'#493026'},health:{text:'#A5E8A3',surface:'#28422A'},general:{text:'#D7FC65',surface:'#354326'}},
   softLight:{study:{text:'#394E9A',surface:'#E1E7FF'},work:{text:'#176F5A',surface:'#D9F2E8'},finance:{text:'#896018',surface:'#FFF0C9'},home:{text:'#A34F35',surface:'#FBE5DC'},health:{text:'#39763D',surface:'#E0F2DD'},general:{text:'#536D23',surface:'#DFE8C7'}}
@@ -39,11 +38,11 @@ export default function Home(){
   const [visibleTaskCount,setVisibleTaskCount]=useState(50);
   const pager=useRef<React.ElementRef<typeof Animated.ScrollView>>(null);
   const horizontalX=useRef(new Animated.Value(0)).current;
-  const verticalY=useRef({home:new Animated.Value(0),tasks:new Animated.Value(0),alerts:new Animated.Value(0),settings:new Animated.Value(0)}).current;
+  const verticalY=useRef({home:new Animated.Value(0),tasks:new Animated.Value(0),alerts:new Animated.Value(0)}).current;
   const [pageWidth,setPageWidth]=useState(Dimensions.get('window').width);
   // Enquanto o dedo está na faixa de filtros, o swipe entre abas fica travado.
   const [filtersTouched,setFiltersTouched]=useState(false);
-  const tabs:Tab[]=['home','tasks','alerts','settings'];
+  const tabs:Tab[]=['home','tasks','alerts'];
   const goToTab=(next:Tab)=>{setTab(next);pager.current?.scrollTo({x:tabs.indexOf(next)*pageWidth,animated:true});};
   const [now,setNow]=useState(Date.now());
   const [deleteTarget,setDeleteTarget]=useState<Task|null>(null);
@@ -58,15 +57,16 @@ export default function Home(){
     const interval=setInterval(()=>setNow(Date.now()),30000);
     return ()=>{sub.remove();clearInterval(interval);};
   },[refresh]));
-  const filteredTasks=taskCategoryFilter==='all'?tasks:tasks.filter(t=>t.category===taskCategoryFilter);
+  const filteredTasks=tasks.filter(t=>!t.parent_id&&(taskCategoryFilter==='all'||t.category===taskCategoryFilter));
   const [filteredPage,setFilteredPage]=useState<Task[]>([]);
   React.useEffect(()=>{let active=true;listTaskPage(50,0,taskCategoryFilter==='all'?undefined:taskCategoryFilter).then(rows=>{if(active){setFilteredPage(rows);setVisibleTaskCount(50);}}).catch(console.warn);return()=>{active=false;};},[taskCategoryFilter,tasks]);
-  async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.length,taskCategoryFilter==='all'?undefined:taskCategoryFilter);setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
-  const pending=tasks.filter(t=>!t.completed);
-  const overdue=pending.filter(t=>t.due_at<now);
-  const upcoming=pending.filter(t=>t.due_at>=now);
-  const today=pending.filter(t=>new Date(t.due_at).toDateString()===new Date(now).toDateString());
-  const completedToday=tasks.filter(t=>!!t.completed&&t.completed_at!=null&&new Date(t.completed_at).toDateString()===new Date(now).toDateString())
+  async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.filter(t=>!t.parent_id).length,taskCategoryFilter==='all'?undefined:taskCategoryFilter);setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.filter(t=>!t.parent_id).length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
+  const roots=tasks.filter(t=>!t.parent_id);
+  const pending=roots.filter(t=>!t.completed);
+  const overdue=pending.filter(t=>!t.daily&&t.due_at<now);
+  const upcoming=pending.filter(t=>t.daily||t.due_at>=now);
+  const today=pending.filter(t=>t.daily||new Date(t.due_at).toDateString()===new Date(now).toDateString());
+  const completedToday=roots.filter(t=>!!t.completed&&t.completed_at!=null&&new Date(t.completed_at).toDateString()===new Date(now).toDateString())
     .sort((a,b)=>(b.completed_at??0)-(a.completed_at??0));
   async function toggle(t:Task){
     try{await completeTask(t.id,!t.completed);await refresh();}
@@ -80,18 +80,20 @@ export default function Home(){
     catch(e){setDeleteTarget(null);setFeedback({title:'Não foi possível excluir.',message:String(e)});}
     finally{setBusyDelete(false);}
   }
+  function groupedCards(items:Task[]){const children=items.filter(t=>t.parent_id);return items.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...children.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
   function card(t:Task){
-    const late=!t.completed&&t.due_at<now;
+    const late=!t.completed&&!t.daily&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
-    return <Pressable key={t.id} style={[s.task,late?{borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+    return <Pressable key={t.id} style={[s.task,t.parent_id?{marginLeft:28,paddingLeft:12,borderLeftWidth:2,borderLeftColor:c.accentSoft,backgroundColor:c.surface}:undefined,late?{borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
       {late?<View pointerEvents="none" style={{position:'absolute',left:-12,right:-12,top:5,bottom:5,backgroundColor:appearance==='dark'?'#34201E':'#F8E2DC',borderRadius:10,borderWidth:1,borderColor:appearance==='dark'?'#77423D':'#E5B0A5'}}/>:null}
+      {t.parent_id?<Text style={{color:c.accent,fontSize:17}}>↳</Text>:null}
       <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,late?{borderColor:appearance==='dark'?'#FF887B':'#B83931'}:undefined,!!t.completed?s.checked:undefined]}>
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
       <View style={{flex:1,gap:7}}>
         <TaskTitle key={`${t.id}-${t.completed}`} title={t.title} completed={!!t.completed} colors={c} style={late?{color:appearance==='dark'?'#FFB5A9':'#A82F27',fontWeight:'900'}:undefined}/>
         {t.description?.trim()?<Text style={s.taskDescription} numberOfLines={2}>{t.description.trim()}</Text>:null}
-        <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{formatDate(t.due_at)}</Text></View>
+        <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{t.daily?'↻ DIÁRIA · '+new Date(t.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):formatDate(t.due_at)}</Text></View>
       </View>
       <View style={s.priorityWrap}>
         {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:7,paddingVertical:5,borderRadius:5}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
@@ -114,7 +116,7 @@ export default function Home(){
       <Animated.ScrollView style={{flex:1}} contentContainerStyle={[s.container,{paddingTop:insets.top+89}]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
         onScroll={Animated.event([{nativeEvent:{contentOffset:{y:verticalY[page]}}}],{useNativeDriver:true})}>
 
-      {page==='settings'?<><SettingsScreen onDataDeleted={()=>refresh().catch(console.warn)}/><Pressable accessibilityRole="button" onPress={()=>router.push('/archive')} style={{marginTop:22,padding:17,backgroundColor:c.surface,borderRadius:10,borderWidth:1,borderColor:c.border}}><Text style={{color:c.accent,fontWeight:'900'}}>HISTÓRICO DE TAREFAS ARQUIVADAS →</Text><Text style={{color:c.muted,fontSize:12,marginTop:6}}>Consulte e restaure tarefas concluídas há mais de 30 dias.</Text></Pressable></>:<>
+      <>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
       {page!=='tasks'?<Text style={s.heading}>{page==='home'?'Seu dia.\nSem desculpas.':'Olha o que\nficou pra trás.'}</Text>:null}
       {page==='home'?<>
@@ -126,22 +128,23 @@ export default function Home(){
           <Text style={s.heroFooter}>{pending.length===0?'Tudo resolvido. Aproveita esse raro momento.':overdue.length?'Tem coisa te esperando. Você sabe o que fazer.':'Por enquanto, tudo sob controle.'}</Text>
         </View>
         <View style={s.sectionHead}><Text style={s.section}>PASSOU DA HORA</Text><Text style={s.sectionCount}>{String(overdue.length).padStart(2,'0')}</Text></View>
-        {overdue.length?overdue.map(card):empty('Nada atrasado. Pode comemorar sem exagerar.')}
+        {overdue.length?groupedCards(tasks.filter(t=>overdue.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada atrasado. Pode comemorar sem exagerar.')}
         <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
-        {upcoming.length?upcoming.slice(0,8).map(card):empty('Nenhuma tarefa futura. Que paz suspeita.')}
+        {upcoming.length?groupedCards(tasks.filter(t=>upcoming.slice(0,8).some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nenhuma tarefa futura. Que paz suspeita.')}
         <View style={s.sectionHead}><Text style={s.section}>CONCLUÍDAS HOJE</Text><Text style={s.sectionCount}>{String(completedToday.length).padStart(2,'0')}</Text></View>
-        {completedToday.length?completedToday.map(card):empty('Nada concluído hoje. Ainda dá tempo.')}
+        {completedToday.length?groupedCards(tasks.filter(t=>completedToday.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada concluído hoje. Ainda dá tempo.')}
       </>:<>
         <View style={s.sectionHead}><Text style={s.section}>{page==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(page==='tasks'?filteredTasks.length:overdue.length).padStart(2,'0')}</Text></View>
+        {page==='tasks'?<Pressable accessibilityRole="button" onPress={()=>router.push('/routines')} style={{alignSelf:'flex-start',borderWidth:1,borderColor:c.accent,borderRadius:9,paddingHorizontal:15,paddingVertical:12,marginBottom:16,backgroundColor:c.accentSoft}}><Text style={{color:c.accent,fontWeight:'900',fontSize:12}}>↻ MINHAS ROTINAS</Text></Pressable>:null}
         {page==='tasks'?<View style={{marginBottom:14}}><ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row',gap:7,paddingVertical:2,paddingRight:4}}
           onTouchStart={()=>setFiltersTouched(true)} onTouchEnd={()=>setFiltersTouched(false)} onTouchCancel={()=>setFiltersTouched(false)} onScrollEndDrag={()=>setFiltersTouched(false)}>{([{key:'all',label:'Todas'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={{paddingHorizontal:13,paddingVertical:8,borderRadius:999,borderWidth:1,borderColor:active?topic.text:c.border,backgroundColor:active?topic.surface:c.surface}}><Text style={{color:active?topic.text:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</ScrollView></View>:null}
-        {page==='tasks'?(filteredTasks.length?filteredPage.map(card):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
+        {page==='tasks'?(filteredTasks.length?groupedCards(filteredPage):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')):(overdue.length?groupedCards(overdue):empty('Tudo em dia. Assim que a gente gosta.'))}
       </>}
       {page==='tasks'&&filteredTasks.length>visibleTaskCount?<Pressable accessibilityRole="button" onPress={loadMoreTasks} style={{backgroundColor:c.surface,borderRadius:9,padding:16,alignItems:'center',marginTop:20}}><Text style={{color:c.accent,fontWeight:'800'}}>{loadingPage?'CARREGANDO...':`CARREGAR MAIS (${filteredTasks.length-visibleTaskCount} RESTANTES)`}</Text></Pressable>:null}
       <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>
-      </>}
+      </>
       </Animated.ScrollView>
-      <Animated.View pointerEvents="none" style={[s.sharedBrand,{
+      <Animated.View pointerEvents="box-none" style={[s.sharedBrand,{
         top:insets.top+18,
         transform:[
           {translateX:Animated.subtract(horizontalX,index*pageWidth)},
@@ -155,13 +158,13 @@ export default function Home(){
           })
         )
       }]}>
-        <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text></View>
+        <View style={s.brand}><View style={s.brandMark}><Text style={s.brandMarkText}>!</Text></View><Text style={s.brandName}>ping<Text style={{color:c.accent}}>.</Text></Text><Text style={s.brandCaption}>FAÇA ACONTECER</Text><Pressable accessibilityRole="button" accessibilityLabel="Abrir ajustes" onPress={()=>router.push("/settings")} style={s.settingsButton}><Text style={s.settingsIcon}>⚙</Text></Pressable></View>
       </Animated.View>
       </View>)}
     </Animated.ScrollView>
-    {tab!=='settings'&&<Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>}
-    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts','settings'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
-      <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS','AJUSTES'][i]}</Text>
+    {<Pressable accessibilityLabel="Criar tarefa" style={[s.add,{bottom:91+insets.bottom}]} onPress={()=>router.push('/edit')}><Text style={s.plus}>+</Text></Pressable>}
+    <View style={[s.nav,{paddingBottom:insets.bottom,height:75+insets.bottom}]}>{(['home','tasks','alerts'] as const).map((key,i)=><Pressable key={key} style={[s.navItem,tab===key&&s.navSelected]} onPress={()=>goToTab(key)}>
+      <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','ATRASOS'][i]}</Text>
       {tab===key?<View style={s.dot}/>:null}
     </Pressable>)}</View>
   </View>;
@@ -172,6 +175,8 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   brand:{flexDirection:'row',alignItems:'center',marginBottom:43,gap:9},brandMark:{width:28,height:28,borderRadius:7,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',transform:[{rotate:'-9deg'}]},
   brandMarkText:{fontSize:21,fontWeight:'900',color:c.background},brandName:{color:c.text,fontSize:25,fontWeight:'900',letterSpacing:-1.5},
   brandCaption:{color:c.muted,fontSize:9,fontWeight:'800',letterSpacing:1.3,marginLeft:'auto'},
+  settingsButton:{width:38,height:38,borderRadius:10,backgroundColor:c.surface,alignItems:'center',justifyContent:'center',marginLeft:5},
+  settingsIcon:{color:c.accent,fontSize:23,fontWeight:'700'},
   eyebrow:{color:c.accent,fontSize:10,fontWeight:'900',letterSpacing:2.5,marginBottom:13},
   heading:{color:c.text,fontSize:40,fontWeight:'900',lineHeight:43,letterSpacing:-2,marginBottom:22},
   hero:{backgroundColor:c.accent,borderRadius:4,padding:23,marginBottom:33,transform:[{rotate:'-1deg'}],overflow:'visible',elevation:c.background==='#111310'?3:0,shadowColor:'#000000',shadowOffset:{width:0,height:3},shadowOpacity:c.background==='#111310'?0.12:0,shadowRadius:6},

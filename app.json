@@ -12,7 +12,7 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#D7FC65",
-          "defaultChannel": "tasks"
+          "defaultChannel": "tasks-feedback-v2"
         }
       ],
       [

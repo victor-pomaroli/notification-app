@@ -6,7 +6,10 @@ import {reminderMessage,reminderOffsets,TaskCategory,ReminderStage} from './temp
 Notifications.setNotificationHandler({
   handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false}),
 });
-const CHANNEL='tasks';
+// O canal antigo 'tasks' foi criado sem som/vibração; o Android não deixa mudar isso
+// depois de criado, por isso o canal novo tem outro id e o antigo é apagado.
+const CHANNEL='tasks-feedback-v2';
+const LEGACY_CHANNELS=['tasks'];
 export const TASK_CATEGORY='task_due';
 export const ACTION_COMPLETE='complete';
 export const ACTION_SNOOZE='snooze';
@@ -14,12 +17,14 @@ export const SNOOZE_MINUTES=15;
 /** Etapa usada para lembretes adiados pelo botão "Adiar". */
 export const SNOOZE_STAGE=9;
 export type ScheduledReminder={notification_id:string;stage:number;scheduled_at:number};
-export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory};
+export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory;daily?:boolean};
 
 /** Cria canal e botões de ação. Não pede permissão: isso acontece após o onboarding. */
 export async function setupNotifications(){
+  if(Platform.OS==='android')await Promise.all(LEGACY_CHANNELS.map(id=>Notifications.deleteNotificationChannelAsync(id).catch(()=>{})));
   if(Platform.OS==='android') await Notifications.setNotificationChannelAsync(CHANNEL,{
     name:'Lembretes de tarefas',importance:Notifications.AndroidImportance.HIGH,
+    sound:'default',enableVibrate:true,vibrationPattern:[0,250,150,250],
   });
   await Notifications.setNotificationCategoryAsync(TASK_CATEGORY,[
     {identifier:ACTION_COMPLETE,buttonTitle:'Concluir',options:{opensAppToForeground:false}},
@@ -59,6 +64,16 @@ export async function scheduleTaskReminders(task:ReminderTask):Promise<Scheduled
   if(!permission.granted){console.warn('[notifications] Permission not granted');return [];}
   const result:ScheduledReminder[]=[];
   try{
+    if(task.daily){
+      const when=new Date(task.due_at);
+      const hour=when.getHours()>=22||when.getHours()<7?7:when.getHours();
+      const minute=hour===7 && (when.getHours()>=22||when.getHours()<7)?0:when.getMinutes();
+      const id=await Notifications.scheduleNotificationAsync({
+        content:{title:prefs.privatePreviews?'Ping · lembrete':task.title,body:prefs.privatePreviews?'Você tem uma tarefa esperando. Abra o Ping para conferir.':'Sua rotina diária está te esperando no Ping.',data:{kind:'task_due',taskId:task.id,daily:true}},
+        trigger:{type:Notifications.SchedulableTriggerInputTypes.DAILY,hour,minute,...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
+      });
+      return [{notification_id:id,stage:0,scheduled_at:Date.now()}];
+    }
     const offsets=reminderOffsets(task.category);
     for(let stage=0;stage<offsets.length;stage++){
       const at=task.due_at+offsets[stage]*60000;
