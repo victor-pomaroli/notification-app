@@ -39,7 +39,15 @@ export async function listArchivedTasks(limit=50,offset=0){const db=await ready;
 export async function archiveTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=? WHERE id=? AND completed=1',Date.now(),id);await refreshWidget();}
 export async function restoreArchivedTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=NULL WHERE id=?',id);await refreshWidget();}
 export async function archiveOldCompletedTasks(){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=? WHERE completed=1 AND archived_at IS NULL AND completed_at IS NOT NULL AND completed_at<=?',Date.now(),Date.now()-2592000000);}
-export async function listWidgetTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 AND archived_at IS NULL ORDER BY due_at ASC,id ASC LIMIT 5');}
+/** Pendentes (próximas 5) e concluídas hoje (mais recentes primeiro) para o widget. */
+export async function listWidgetTasks(){
+  const db=await ready;const startOfDay=new Date();startOfDay.setHours(0,0,0,0);
+  const [pending,done]=await Promise.all([
+    db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 AND archived_at IS NULL ORDER BY due_at ASC,id ASC LIMIT 5'),
+    db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=1 AND archived_at IS NULL AND completed_at>=? ORDER BY completed_at DESC,id DESC LIMIT 5',startOfDay.getTime()),
+  ]);
+  return {pending,done};
+}
 export async function getTask(id:number){const db=await ready;return db.getFirstAsync<Task>('SELECT * FROM tasks WHERE id=?',id);}
 async function reminderIds(id:number){
   const db=await ready;
