@@ -59,7 +59,8 @@ export default function Home(){
   const [filteredPage,setFilteredPage]=useState<Task[]>([]);
   React.useEffect(()=>{let active=true;listTaskPage(50,0,taskCategoryFilter==='all'?undefined:taskCategoryFilter).then(rows=>{if(active){setFilteredPage(rows);setVisibleTaskCount(50);}}).catch(console.warn);return()=>{active=false;};},[taskCategoryFilter,tasks]);
   async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.length,taskCategoryFilter==='all'?undefined:taskCategoryFilter);setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
-  const pending=tasks.filter(t=>!t.completed);
+  const roots=tasks.filter(t=>!t.parent_id);
+  const pending=roots.filter(t=>!t.completed);
   const overdue=pending.filter(t=>t.due_at<now);
   const upcoming=pending.filter(t=>t.due_at>=now);
   const today=pending.filter(t=>new Date(t.due_at).toDateString()===new Date(now).toDateString());
@@ -75,11 +76,13 @@ export default function Home(){
     catch(e){setDeleteTarget(null);setFeedback({title:'Não foi possível excluir.',message:String(e)});}
     finally{setBusyDelete(false);}
   }
+  function groupedCards(items:Task[]){return items.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...tasks.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
   function card(t:Task){
     const late=!t.completed&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
-    return <Pressable key={t.id} style={[s.task,late?{borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+    return <Pressable key={t.id} style={[s.task,t.parent_id?{marginLeft:28,paddingLeft:12,borderLeftWidth:2,borderLeftColor:c.accentSoft,backgroundColor:c.surface}:undefined,late?{borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
       {late?<View pointerEvents="none" style={{position:'absolute',left:-12,right:-12,top:5,bottom:5,backgroundColor:appearance==='dark'?'#34201E':'#F8E2DC',borderRadius:10,borderWidth:1,borderColor:appearance==='dark'?'#77423D':'#E5B0A5'}}/>:null}
+      {t.parent_id?<Text style={{color:c.accent,fontSize:17}}>↳</Text>:null}
       <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,late?{borderColor:appearance==='dark'?'#FF887B':'#B83931'}:undefined,!!t.completed?s.checked:undefined]}>
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
@@ -120,13 +123,13 @@ export default function Home(){
           <Text style={s.heroFooter}>{pending.length===0?'Tudo resolvido. Aproveita esse raro momento.':overdue.length?'Tem coisa te esperando. Você sabe o que fazer.':'Por enquanto, tudo sob controle.'}</Text>
         </View>
         <View style={s.sectionHead}><Text style={s.section}>PASSOU DA HORA</Text><Text style={s.sectionCount}>{String(overdue.length).padStart(2,'0')}</Text></View>
-        {overdue.length?overdue.map(card):empty('Nada atrasado. Pode comemorar sem exagerar.')}
+        {overdue.length?groupedCards(overdue):empty('Nada atrasado. Pode comemorar sem exagerar.')}
         <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
-        {upcoming.length?upcoming.slice(0,8).map(card):empty('Nenhuma tarefa futura. Que paz suspeita.')}
+        {upcoming.length?groupedCards(upcoming.slice(0,8)):empty('Nenhuma tarefa futura. Que paz suspeita.')}
       </>:<>
         <View style={s.sectionHead}><Text style={s.section}>{page==='tasks'?'TODAS AS TAREFAS':'PENDÊNCIAS ATRASADAS'}</Text><Text style={s.sectionCount}>{String(page==='tasks'?filteredTasks.length:overdue.length).padStart(2,'0')}</Text></View>
         {page==='tasks'?<View style={{marginBottom:18}}><View style={{flexDirection:'row',flexWrap:'wrap',gap:8,paddingVertical:3}}>{([{key:'all',label:'Todas'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={{paddingHorizontal:15,paddingVertical:11,borderRadius:999,borderWidth:1,borderColor:active?topic.text:c.border,backgroundColor:active?topic.surface:c.surface}}><Text style={{color:active?topic.text:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</View></View>:null}
-        {page==='tasks'?(filteredTasks.length?filteredPage.map(card):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')):(overdue.length?overdue.map(card):empty('Tudo em dia. Assim que a gente gosta.'))}
+        {page==='tasks'?(filteredTasks.length?groupedCards(filteredPage):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')):(overdue.length?groupedCards(overdue):empty('Tudo em dia. Assim que a gente gosta.'))}
       </>}
       {page==='tasks'&&filteredTasks.length>visibleTaskCount?<Pressable accessibilityRole="button" onPress={loadMoreTasks} style={{backgroundColor:c.surface,borderRadius:9,padding:16,alignItems:'center',marginTop:20}}><Text style={{color:c.accent,fontWeight:'800'}}>{loadingPage?'CARREGANDO...':`CARREGAR MAIS (${filteredTasks.length-visibleTaskCount} RESTANTES)`}</Text></Pressable>:null}
       <Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>

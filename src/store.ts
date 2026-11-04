@@ -3,7 +3,7 @@ import {getPreferences} from './preferences';
 import {reminderOffsets} from './templates';
 import {TaskCategory} from './templates';
 import {cancelTaskReminders,scheduleTaskReminders,ScheduledReminder} from './notifications';
-export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;completed_at:number|null;archived_at:number|null;notification_id:string|null};
+export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;completed_at:number|null;archived_at:number|null;notification_id:string|null;parent_id:number|null};
 export type TaskInput=Pick<Task,'title'|'description'|'due_at'|'priority'|'category'>;
 const dbPromise=SQLite.openDatabaseAsync('tasks.db');
 const ready=(async()=>{
@@ -23,7 +23,9 @@ const ready=(async()=>{
   const cols=await db.getAllAsync<{name:string}>('PRAGMA table_info(tasks)');
   if(!cols.some(c=>c.name==='category'))await db.execAsync("ALTER TABLE tasks ADD COLUMN category TEXT NOT NULL DEFAULT 'general'");
   if(!cols.some(c=>c.name==='completed_at'))await db.execAsync('ALTER TABLE tasks ADD COLUMN completed_at INTEGER');
+  if(!cols.some(c=>c.name==='parent_id'))await db.execAsync('ALTER TABLE tasks ADD COLUMN parent_id INTEGER');
   if(!cols.some(c=>c.name==='archived_at'))await db.execAsync('ALTER TABLE tasks ADD COLUMN archived_at INTEGER');
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id)');
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(completed,due_at)');
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_archive ON tasks(archived_at,completed_at)');
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_active_category ON tasks(archived_at,category,completed,due_at,id)');
@@ -35,11 +37,11 @@ export async function initDB(){await ready;}
 async function refreshWidget(){try{const {Platform}=await import('react-native');if(Platform.OS==='android')await (await import('./widget/sync')).refreshPingWidget();}catch(e){console.warn('[widget] Refresh failed:',e);}}
 export async function listTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY completed ASC,due_at ASC');}
 export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){const db=await ready;return category?db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND category=? ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?',category,limit,offset):db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY completed ASC,due_at ASC,id ASC LIMIT ? OFFSET ?',limit,offset);}
-export async function listArchivedTasks(limit=50,offset=0){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NOT NULL ORDER BY archived_at DESC LIMIT ? OFFSET ?',limit,offset);}
-export async function archiveTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=? WHERE id=? AND completed=1',Date.now(),id);await refreshWidget();}
-export async function restoreArchivedTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=NULL WHERE id=?',id);await refreshWidget();}
+export async function listArchivedTasks(limit=50,offset=0){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NOT NULL ORDER BY archived_at DESC LIMIT ? OFFSET ?',limit,offset);}
+export async function archiveTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=? WHERE (id=? OR parent_id=?) AND completed=1',Date.now(),id,id);await refreshWidget();}
+export async function restoreArchivedTask(id:number){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=NULL WHERE id=? OR parent_id=?',id,id);await refreshWidget();}
 export async function archiveOldCompletedTasks(){const db=await ready;await db.runAsync('UPDATE tasks SET archived_at=? WHERE completed=1 AND archived_at IS NULL AND completed_at IS NOT NULL AND completed_at<=?',Date.now(),Date.now()-2592000000);}
-export async function listWidgetTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 AND archived_at IS NULL ORDER BY due_at ASC,id ASC LIMIT 5');}
+export async function listWidgetTasks(){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND completed=0 AND archived_at IS NULL ORDER BY due_at ASC,id ASC LIMIT 5');}
 export async function getTask(id:number){const db=await ready;return db.getFirstAsync<Task>('SELECT * FROM tasks WHERE id=?',id);}
 async function reminderIds(id:number){
   const db=await ready;
@@ -53,7 +55,7 @@ async function replaceReminders(id:number,task:TaskInput,completed:boolean){
   await cancelTaskReminders(old);
   await db.runAsync('DELETE FROM task_notifications WHERE task_id=?',id);
   await db.runAsync('UPDATE tasks SET notification_id=NULL WHERE id=?',id);
-  if(completed)return;
+  if(completed || (await getTask(id))?.parent_id)return;
   const scheduled=await scheduleTaskReminders({id,title:task.title,due_at:task.due_at,category:task.category});
   try{
     for(const item of scheduled)await db.runAsync(
@@ -61,6 +63,20 @@ async function replaceReminders(id:number,task:TaskInput,completed:boolean){
       item.notification_id,id,item.stage,item.scheduled_at);
     await db.runAsync('UPDATE tasks SET notification_id=? WHERE id=?',scheduled[0]?.notification_id??null,id);
   }catch(e){await cancelTaskReminders(scheduled.map(x=>x.notification_id));throw e;}
+}
+export async function listChildren(parentId:number){const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id=? ORDER BY id ASC',parentId);}
+export async function saveTaskGroup(task:TaskInput,children:string[],id?:number){
+  const parent=await saveTask(task,id);
+  const db=await ready;
+  const existing=id?await listChildren(parent.id):[];
+  const clean=children.map(x=>x.trim()).filter(Boolean);
+  for(let i=0;i<clean.length;i++){
+    if(existing[i])await db.runAsync('UPDATE tasks SET title=? WHERE id=?',clean[i],existing[i].id);
+    else await db.runAsync('INSERT INTO tasks(title,description,due_at,priority,category,parent_id,completed,completed_at) VALUES(?,?,?,?,?,?,?,?)',clean[i],'',task.due_at,task.priority,task.category,parent.id,(await getTask(parent.id))?.completed?1:0,(await getTask(parent.id))?.completed?Date.now():null);
+  }
+  for(const old of existing.slice(clean.length))await deleteTask(old.id);
+  await refreshWidget();
+  return parent;
 }
 export async function saveTask(task:TaskInput,id?:number){
   const db=await ready;
@@ -84,12 +100,20 @@ export async function completeTask(id:number,completed:boolean){
   if(!task)return;
   await db.runAsync('UPDATE tasks SET completed=?,completed_at=?,archived_at=NULL WHERE id=?',completed?1:0,completed?Date.now():null,id);
   await replaceReminders(id,task,completed);
+  if(!task.parent_id){
+    const children=await listChildren(id);
+    for(const child of children){
+      await db.runAsync('UPDATE tasks SET completed=?,completed_at=?,archived_at=NULL WHERE id=?',completed?1:0,completed?Date.now():null,child.id);
+    }
+  }
   await refreshWidget();
 }
 export async function deleteTask(id:number){
   const db=await ready;
   await cancelTaskReminders(await reminderIds(id));
   await db.runAsync('DELETE FROM task_notifications WHERE task_id=?',id);
+  const children=await listChildren(id);
+  for(const child of children)await deleteTask(child.id);
   await db.runAsync('DELETE FROM tasks WHERE id=?',id);
   await refreshWidget();
 }
@@ -106,7 +130,7 @@ export async function reconcileReminders(){
   }
   const pending=await (await import('expo-notifications')).getAllScheduledNotificationsAsync();
   const available=new Set(pending.map(n=>n.identifier));
-  const tasks=await (await ready).getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 AND archived_at IS NULL ORDER BY due_at ASC');
+  const tasks=await (await ready).getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND completed=0 AND archived_at IS NULL ORDER BY due_at ASC');
   const notificationRows=await db.getAllAsync<{task_id:number;notification_id:string;scheduled_at:number}>('SELECT task_id,notification_id,scheduled_at FROM task_notifications');
   const byTask=new Map<number,typeof notificationRows>();
   for(const row of notificationRows){const group=byTask.get(row.task_id)??[];group.push(row);byTask.set(row.task_id,group);}
@@ -129,7 +153,7 @@ export async function reconcileReminders(){
 
 export async function rescheduleAllReminders(){
   const db=await ready;
-  const tasks=await db.getAllAsync<Task>('SELECT * FROM tasks WHERE completed=0 AND archived_at IS NULL ORDER BY due_at ASC');
+  const tasks=await db.getAllAsync<Task>('SELECT * FROM tasks WHERE parent_id IS NULL AND completed=0 AND archived_at IS NULL ORDER BY due_at ASC');
   for(const task of tasks)await replaceReminders(task.id,task,!!task.completed);
 }
 export async function deleteAllTasks(){
