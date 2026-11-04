@@ -6,7 +6,14 @@ import {getMeta,setMeta} from './preferences';
 export const BACKGROUND_NOTIFICATION_TASK='ping-notification-actions';
 
 function taskIdOf(response:Notifications.NotificationResponse){
-  const id=Number(response.notification.request.content.data?.taskId);
+  const content=response.notification?.request?.content as (Notifications.NotificationContent&{dataString?:string})|undefined;
+  let data:Record<string,unknown>|undefined=content?.data??undefined;
+  // Na tarefa em segundo plano (app fechado) o Android entrega os dados crus como
+  // JSON em `dataString`; só o listener do app aberto já os converte para `data`.
+  if((!data||data.taskId===undefined)&&typeof content?.dataString==='string'){
+    try{data=JSON.parse(content.dataString);}catch{data=undefined;}
+  }
+  const id=Number(data?.taskId);
   return Number.isFinite(id)&&id>0?id:null;
 }
 
@@ -27,6 +34,8 @@ export async function handleNotificationResponse(response:Notifications.Notifica
   const store=await import('./store');
   if(action===ACTION_COMPLETE)await store.completeTask(taskId,true);
   else if(action===ACTION_SNOOZE)await store.snoozeTask(taskId);
+  // Botões com opensAppToForeground:false não fecham a notificação sozinhos no Android.
+  await Notifications.dismissNotificationAsync(response.notification.request.identifier).catch(()=>{});
   return null;
 }
 
