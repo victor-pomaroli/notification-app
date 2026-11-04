@@ -33,3 +33,11 @@ export function ThemeProvider({children}:{children:React.ReactNode}){
   return React.createElement(ThemeContext.Provider,{value},children);
 }
 export const useAppTheme=()=>useContext(ThemeContext);
+
+/** Cores características de cada assunto (texto/realce e fundo do chip), por aparência. */
+export const categoryColors:Record<Appearance,Record<'study'|'work'|'finance'|'home'|'health'|'general',{text:string;surface:string}>>={
+  dark:{study:{text:'#A9B8FF',surface:'#29314A'},work:{text:'#7DDCC7',surface:'#203C35'},finance:{text:'#F7CE7A',surface:'#44371F'},home:{text:'#FFAD91',surface:'#493026'},health:{text:'#A5E8A3',surface:'#28422A'},general:{text:'#D7FC65',surface:'#354326'}},
+  softLight:{study:{text:'#394E9A',surface:'#E1E7FF'},work:{text:'#176F5A',surface:'#D9F2E8'},finance:{text:'#896018',surface:'#FFF0C9'},home:{text:'#A34F35',surface:'#FBE5DC'},health:{text:'#39763D',surface:'#E0F2DD'},general:{text:'#536D23',surface:'#DFE8C7'}},
+};
+/** Cores da urgência, usadas no risco da lista e na criação. */
+export const priorityColors={low:'#77CDA3',medium:'#F7C66F',high:'#FF887B'} as const;

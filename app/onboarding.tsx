@@ -4,6 +4,7 @@ import {useRouter} from 'expo-router';
 import {useAppTheme,ThemeColors,Appearance,palettes} from '../src/theme';
 import {AddressStyle,NotificationPersonality,completeOnboarding,getPreferences} from '../src/preferences';
 import {rescheduleAllReminders} from '../src/store';
+import {ensureNotificationPermission} from '../src/notifications';
 
 const personalities:[NotificationPersonality,string,string,string][]=[
   ['debochado','😏 Debochado','Ironia na medida certa.','A responsabilidade bateu de novo. Vai atender?'],
@@ -28,6 +29,7 @@ export default function Onboarding(){
     setBusy(true);setError('');
     try{
       await completeOnboarding(name,address,personality);
+      await ensureNotificationPermission().catch(console.warn);
       await rescheduleAllReminders().catch(console.warn);
       router.replace('/');
     }catch(e){setError('Não foi possível salvar. Tente novamente.');console.warn(e);}

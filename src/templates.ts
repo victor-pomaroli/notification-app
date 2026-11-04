@@ -3,6 +3,10 @@ export const categories = {
   home: 'Casa', health: 'Saúde', general: 'Geral',
 } as const;
 export type TaskCategory = keyof typeof categories;
+/** Um emoji por assunto, todos objetos do mesmo estilo para ficarem alinhados. */
+export const categoryEmoji: Record<TaskCategory, string> = {
+  study: '🎓', work: '💼', finance: '💰', home: '🏡', health: '🩺', general: '📌',
+};
 export type ReminderStage = 0 | 1 | 2 | 3;
 import type {AddressStyle,NotificationPersonality} from './preferences';
 const templates:Record<TaskCategory,Record<ReminderStage,readonly string[]>>={
@@ -35,15 +39,27 @@ export function reminderMessage(category:TaskCategory,stage:ReminderStage,varian
  const bank=personality==='debochado'?templates:personalityTemplates[personality];
  const options=bank[category]?.[stage]??bank.general[stage];
  const vocativo=addressStyle==='masculine'?'campeão':addressStyle==='feminine'?'campeã':'pessoa';
- const message=options[Math.abs(variant)%options.length].replace(/\{vocativo\}/g,vocativo);
+ const template=options[Math.abs(variant)%options.length];
  const name=displayName.trim().slice(0,32);
+ // Com nome definido, ele substitui o vocativo em vez de aparecer duas vezes.
+ if(name&&template.includes('{vocativo}'))return template.replace(/\{vocativo\}/g,name);
+ const message=template.replace(/\{vocativo\}/g,vocativo);
  if(!name)return message;
  // Alterna entre nome no início, no fim e nenhuma menção.
  // A mesma tarefa mantém a escolha em todos os reagendamentos.
  const position=Math.abs(variant+stage)%3;
- if(position===0)return name+', '+message.charAt(0).toLowerCase()+message.slice(1);
+ if(position===0){
+   // Mensagens em CAIXA ALTA mantêm a primeira palavra intacta ("EI!", "BORA").
+   const firstWord=message.split(/\s/)[0];
+   const shouted=firstWord.length>1&&firstWord===firstWord.toUpperCase()&&firstWord!==firstWord.toLowerCase();
+   return name+', '+(shouted?message:message.charAt(0).toLowerCase()+message.slice(1));
+ }
  if(position===1){
-   return message.replace(/[.!?]+$/,'')+', '+name+'.';
+   // Insere o nome antes da pontuação final e de um emoji final, preservando ambos.
+   const match=message.match(/^(.*?)([.!?…]*)((?:\s*\p{Extended_Pictographic}️?)*)$/u);
+   if(!match)return message;
+   const [,core,punct,emoji]=match;
+   return core+', '+name+(punct||'.')+emoji;
  }
  return message;
 }

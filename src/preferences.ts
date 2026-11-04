@@ -34,3 +34,16 @@ export async function completeOnboarding(name:string,addressStyle:AddressStyle,p
     await conn.runAsync('INSERT OR REPLACE INTO app_preferences(key,value) VALUES(?,?)','onboardingComplete','true');
   });
 }
+
+/** Valores internos (não são preferências do usuário), na mesma tabela. */
+export async function getMeta(key:string):Promise<string|null>{
+  const conn=await db;
+  await conn.execAsync('CREATE TABLE IF NOT EXISTS app_preferences (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
+  const row=await conn.getFirstAsync<{value:string}>('SELECT value FROM app_preferences WHERE key=?','meta:'+key);
+  return row?.value??null;
+}
+export async function setMeta(key:string,value:string){
+  const conn=await db;
+  await conn.execAsync('CREATE TABLE IF NOT EXISTS app_preferences (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
+  await conn.runAsync('INSERT OR REPLACE INTO app_preferences(key,value) VALUES(?,?)','meta:'+key,value);
+}

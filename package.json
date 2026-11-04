@@ -1,5 +1,5 @@
 {
-  "name": "notification-app",
+  "name": "ping",
   "version": "1.0.2",
   "private": true,
   "main": "index.ts",
@@ -8,26 +8,30 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "deps:fix": "expo install --fix",
-    "deps:check": "expo install --check"
+    "deps:check": "expo install --check",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.16",
     "@react-native-community/datetimepicker": "*",
-    "expo": "~58.0.0",
+    "expo": "~58.0.23",
     "expo-constants": "*",
-    "expo-notifications": "*",
-    "expo-router": "*",
+    "expo-linking": "~58.0.16",
+    "expo-notifications": "~58.1.8",
+    "expo-router": "~58.0.30",
     "expo-sqlite": "*",
     "expo-status-bar": "*",
+    "expo-task-manager": "~58.0.13",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-android-widget": "^0.22.1",
-    "react-native-safe-area-context": "*",
+    "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "*"
   },
   "devDependencies": {
     "@types/react": "*",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   }
 }

@@ -1,9 +1,8 @@
-
 {
   "expo": {
     "name": "Ping",
-    "slug": "minhas-tarefas",
-    "scheme": "minhastarefas",
+    "slug": "ping",
+    "scheme": "ping",
     "icon": "./assets/icon.png",
     "plugins": [
       "expo-router",
@@ -11,7 +10,9 @@
       [
         "expo-notifications",
         {
-          "defaultChannel": "tasks"
+          "icon": "./assets/notification-icon.png",
+          "color": "#D7FC65",
+          "defaultChannel": "tasks-feedback-v2"
         }
       ],
       [
@@ -20,27 +21,42 @@
           "widgets": [
             {
               "name": "PingTasks",
-              "label": "Ping · 5 tarefas",
-              "description": "As cinco tarefas pendentes mais recentes",
-              "minWidth": "280dp",
-              "minHeight": "280dp",
+              "label": "Ping · próximas tarefas",
+              "description": "Suas próximas tarefas pendentes",
+              "minWidth": "250dp",
+              "minHeight": "180dp",
               "targetCellWidth": 4,
               "targetCellHeight": 4,
-              "updatePeriodMillis": 1800000
+              "updatePeriodMillis": 1800000,
+              "resizeMode": "horizontal|vertical"
             }
           ]
         }
       ]
     ],
     "android": {
-      "package": "com.example.minhastarefas",
+      "package": "com.example.ping",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#F4F1E7"
-      }
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0C0B"
+      },
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM"
+      ]
     },
     "ios": {
-      "bundleIdentifier": "com.example.minhastarefas"
+      "bundleIdentifier": "com.example.ping"
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "642c8d8f-c000-4d9c-8e27-54a5862fad11"
+      }
     }
   }
 }

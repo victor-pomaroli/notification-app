@@ -6,23 +6,57 @@ import {reminderMessage,reminderOffsets,TaskCategory,ReminderStage} from './temp
 Notifications.setNotificationHandler({
   handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false}),
 });
-const CHANNEL='tasks';
+// O canal antigo 'tasks' foi criado sem som/vibração; o Android não deixa mudar isso
+// depois de criado, por isso o canal novo tem outro id e o antigo é apagado.
+const CHANNEL='tasks-feedback-v2';
+const LEGACY_CHANNELS=['tasks'];
+export const TASK_CATEGORY='task_due';
+export const ACTION_COMPLETE='complete';
+export const ACTION_SNOOZE='snooze';
+export const SNOOZE_MINUTES=15;
+/** Etapa usada para lembretes adiados pelo botão "Adiar". */
+export const SNOOZE_STAGE=9;
 export type ScheduledReminder={notification_id:string;stage:number;scheduled_at:number};
-export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory};
+export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory;daily?:boolean};
+
+/** Cria canal e botões de ação. Não pede permissão: isso acontece após o onboarding. */
 export async function setupNotifications(){
+  if(Platform.OS==='android')await Promise.all(LEGACY_CHANNELS.map(id=>Notifications.deleteNotificationChannelAsync(id).catch(()=>{})));
   if(Platform.OS==='android') await Notifications.setNotificationChannelAsync(CHANNEL,{
     name:'Lembretes de tarefas',importance:Notifications.AndroidImportance.HIGH,
+    sound:'default',enableVibrate:true,vibrationPattern:[0,250,150,250],
   });
+  await Notifications.setNotificationCategoryAsync(TASK_CATEGORY,[
+    {identifier:ACTION_COMPLETE,buttonTitle:'Concluir',options:{opensAppToForeground:false}},
+    {identifier:ACTION_SNOOZE,buttonTitle:`Adiar ${SNOOZE_MINUTES} min`,options:{opensAppToForeground:false}},
+  ]);
+}
+/** Pede a permissão de notificações se ainda for possível perguntar. */
+export async function ensureNotificationPermission(){
   const current=await Notifications.getPermissionsAsync();
-  if(!current.granted && current.canAskAgain) await Notifications.requestPermissionsAsync();
+  if(current.granted||!current.canAskAgain)return current.granted;
+  return (await Notifications.requestPermissionsAsync()).granted;
 }
-function allowedTime(timestamp:number){
-  // Silêncio das 22h às 7h: desloca para 7h da manhã local.
-  const date=new Date(timestamp);
-  if(date.getHours()>=22){date.setDate(date.getDate()+1);date.setHours(7,0,0,0);}
-  else if(date.getHours()<7) date.setHours(7,0,0,0);
-  return date.getTime();
+
+async function buildContent(task:ReminderTask,stage:ReminderStage,variant:number):Promise<Notifications.NotificationContentInput>{
+  const prefs=await getPreferences();
+  return {
+    title:prefs.privatePreviews?'Ping · lembrete':task.title,
+    body:prefs.privatePreviews?'Você tem uma tarefa esperando. Abra o Ping para conferir.':reminderMessage(task.category,stage,variant,prefs.displayName,prefs.addressStyle,prefs.personality),
+    data:{kind:'task_due',taskId:task.id,stage},
+    categoryIdentifier:TASK_CATEGORY,
+  };
 }
+/**
+ * `alarmClock` usa AlarmManager.setAlarmClock(): o Android nunca atrasa (nem em Doze nem por
+ * economia de bateria do fabricante), mas mostra o ícone de despertador na barra de status
+ * até disparar. Por isso só o aviso do horário da tarefa usa esse modo.
+ */
+function dateTrigger(at:number,delivery:Notifications.NotificationDelivery='bestEffort'):Notifications.NotificationTriggerInput{
+  return {type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(at),
+    ...(Platform.OS==='android'?{channelId:CHANNEL,delivery}:{})};
+}
+
 export async function scheduleTaskReminders(task:ReminderTask):Promise<ScheduledReminder[]>{
   const prefs=await getPreferences();
   if(!prefs.notifications)return [];
@@ -30,28 +64,52 @@ export async function scheduleTaskReminders(task:ReminderTask):Promise<Scheduled
   if(!permission.granted){console.warn('[notifications] Permission not granted');return [];}
   const result:ScheduledReminder[]=[];
   try{
-    const offsets=reminderOffsets(task.category);
-    const used=new Set<number>();
-    for(let stage=0;stage<offsets.length;stage++){
-      const at=allowedTime(task.due_at+offsets[stage]*60000);
-      if(at<=Date.now()||used.has(at))continue;
-      used.add(at);
+    if(task.daily){
+      const when=new Date(task.due_at);
+      const hour=when.getHours()>=22||when.getHours()<7?7:when.getHours();
+      const minute=hour===7 && (when.getHours()>=22||when.getHours()<7)?0:when.getMinutes();
       const id=await Notifications.scheduleNotificationAsync({
-        content:{
-          title:prefs.privatePreviews?'Ping · lembrete':task.title,
-          body:prefs.privatePreviews?'Você tem uma tarefa esperando. Abra o Ping para conferir.':reminderMessage(task.category,stage as ReminderStage,task.id+stage,prefs.displayName,prefs.addressStyle,prefs.personality),
-          data:{kind:'task_due',taskId:task.id,stage},
-        },
-        trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(at),
-          ...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
+        content:{title:prefs.privatePreviews?'Ping · lembrete':task.title,body:prefs.privatePreviews?'Você tem uma tarefa esperando. Abra o Ping para conferir.':'Sua rotina diária está te esperando no Ping.',data:{kind:'task_due',taskId:task.id,daily:true}},
+        trigger:{type:Notifications.SchedulableTriggerInputTypes.DAILY,hour,minute,...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
+      });
+      return [{notification_id:id,stage:0,scheduled_at:Date.now()}];
+    }
+    const offsets=reminderOffsets(task.category);
+    for(let stage=0;stage<offsets.length;stage++){
+      const at=task.due_at+offsets[stage]*60000;
+      if(at<=Date.now())continue;
+      const id=await Notifications.scheduleNotificationAsync({
+        content:await buildContent(task,stage as ReminderStage,task.id+stage),
+        trigger:dateTrigger(at,stage===0?'alarmClock':'bestEffort'),
       });
       result.push({notification_id:id,stage,scheduled_at:at});
     }
     return result;
   }catch(e){await cancelTaskReminders(result.map(x=>x.notification_id));throw e;}
 }
+/** Agenda um único lembrete daqui a SNOOZE_MINUTES (botão "Adiar"). */
+export async function scheduleSnoozeReminder(task:ReminderTask):Promise<ScheduledReminder|null>{
+  const prefs=await getPreferences();
+  if(!prefs.notifications)return null;
+  const at=Date.now()+SNOOZE_MINUTES*60000;
+  // Etapa 1 = mensagens de "ainda está pendente", adequadas para um adiamento.
+  const id=await Notifications.scheduleNotificationAsync({content:await buildContent(task,1,task.id+1),trigger:dateTrigger(at)});
+  return {notification_id:id,stage:SNOOZE_STAGE,scheduled_at:at};
+}
 export async function cancelTaskReminders(ids:string[]){
   await Promise.all(ids.map(id=>Notifications.cancelScheduledNotificationAsync(id).catch(console.warn)));
+}
+/** Remove da bandeja as notificações já exibidas de uma tarefa. */
+export async function dismissTaskNotifications(taskId:number){
+  try{
+    const presented=await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(presented
+      .filter(n=>Number(n.request.content.data?.taskId)===taskId)
+      .map(n=>Notifications.dismissNotificationAsync(n.request.identifier).catch(console.warn)));
+  }catch(e){console.warn('[notifications] dismiss failed',e);}
+}
+export async function dismissAllTaskNotifications(){
+  await Notifications.dismissAllNotificationsAsync().catch(console.warn);
 }
 export async function testNotification(){
   const permission=await Notifications.getPermissionsAsync();
@@ -59,7 +117,6 @@ export async function testNotification(){
   const prefs=await getPreferences();
   return Notifications.scheduleNotificationAsync({
     content:{title:prefs.privatePreviews?'Ping - lembrete':'Teste do Ping!',body:prefs.privatePreviews?'Abra o Ping para conferir seu lembrete.':reminderMessage('general',0,0,prefs.displayName,prefs.addressStyle,prefs.personality),data:{kind:'test'}},
-    trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:new Date(Date.now()+10000),
-      ...(Platform.OS==='android'?{channelId:CHANNEL}:{})},
+    trigger:dateTrigger(Date.now()+10000),
   });
 }
