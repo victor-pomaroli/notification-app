@@ -42,14 +42,17 @@ const ready=(async()=>{
 })();
 export async function initDB(){await ready;}
 async function refreshWidget(){try{const {Platform}=await import('react-native');if(Platform.OS==='android')await (await import('./widget/sync')).refreshPingWidget();}catch(e){console.warn('[widget] Refresh failed:',e);}}
-export async function listTasks(){await syncDailyTasks();const db=await ready;return db.getAllAsync<Task>('SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM tasks WHERE daily=1 AND daily_active<>1)) ORDER BY completed ASC,no_due ASC,due_at ASC');}
+/** Concluídas antes de hoje saem da Home/Tarefas (continuam no Calendário). Rotinas resetam todo dia. */
+const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime();};
+const HIDE_DONE_BEFORE_TODAY='NOT (daily=0 AND completed=1 AND completed_at IS NOT NULL AND completed_at<?)';
+export async function listTasks(){await syncDailyTasks();const db=await ready;const cut=startOfToday();return db.getAllAsync<Task>(`SELECT * FROM tasks WHERE archived_at IS NULL AND (daily=0 OR daily_active=1) AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM tasks WHERE daily=1 AND daily_active<>1)) AND (parent_id IS NOT NULL OR ${HIDE_DONE_BEFORE_TODAY}) AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM tasks WHERE parent_id IS NULL AND NOT ${HIDE_DONE_BEFORE_TODAY})) ORDER BY completed ASC,no_due ASC,due_at ASC`,cut,cut);}
 // Page by root tasks, then fetch all children of those roots in the same result.
 export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){
   await syncDailyTasks();
   const db=await ready;
   const roots=category
-    ?await db.getAllAsync<Task>("SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND category=? ORDER BY completed ASC,no_due ASC,due_at ASC,id ASC LIMIT ? OFFSET ?",category,limit,offset)
-    :await db.getAllAsync<Task>("SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) ORDER BY completed ASC,no_due ASC,due_at ASC,id ASC LIMIT ? OFFSET ?",limit,offset);
+    ?await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND ${HIDE_DONE_BEFORE_TODAY} AND category=? ORDER BY completed ASC,no_due ASC,due_at ASC,id ASC LIMIT ? OFFSET ?`,startOfToday(),category,limit,offset)
+    :await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND ${HIDE_DONE_BEFORE_TODAY} ORDER BY completed ASC,no_due ASC,due_at ASC,id ASC LIMIT ? OFFSET ?`,startOfToday(),limit,offset);
   if(!roots.length)return [];
   const ids=roots.map(root=>root.id);
   const children=await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IN (${ids.map(()=>'?').join(',')}) AND archived_at IS NULL ORDER BY id ASC`,...ids);

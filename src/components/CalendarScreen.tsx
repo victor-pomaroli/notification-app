@@ -4,6 +4,7 @@ import {useRouter} from 'expo-router';
 import {CalendarDaySummary,CalendarEntry,listCalendarDay,listCalendarMonth,completeTask} from '../store';
 import {useAppTheme,ThemeColors,priorityColors} from '../theme';
 import {categories} from '../templates';
+import {TaskTitle} from './TaskTitle';
 
 const key=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
 const bounds=(d:Date)=>{const start=new Date(d.getFullYear(),d.getMonth(),d.getDate());const end=new Date(start);end.setDate(end.getDate()+1);return [start.getTime(),end.getTime()] as const;};
@@ -120,7 +121,7 @@ export function CalendarScreen({active,refreshKey,selected,onSelect}:{active:boo
           <Text style={s.checkText}>{entry.completed?'✓':''}</Text>
         </Pressable>
         <View style={{flex:1,minWidth:0}}>
-          <Text numberOfLines={2} style={[s.title,entry.completed&&s.titleDone]}>{t.title}</Text>
+          <TaskTitle key={`${t.id}-${entry.completed}`} title={t.title} completed={entry.completed} colors={c} numberOfLines={2} style={{fontSize:16,fontWeight:'700',letterSpacing:0}}/>
           <Text style={s.meta}>{entry.routine?'↻ '+time:time} · {categories[t.category]}</Text>
         </View>
         <View style={[s.priority,{backgroundColor:priorityColors[t.priority]}]}/>
@@ -156,7 +157,6 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   checked:{backgroundColor:c.accent,borderColor:c.accent},
   checkText:{color:c.background,fontWeight:'900',fontSize:14},
   title:{color:c.text,fontSize:16,fontWeight:'700'},
-  titleDone:{color:c.muted,textDecorationLine:'line-through'},
   meta:{color:c.muted,fontSize:12,marginTop:4},
   priority:{width:26,height:5,borderRadius:3},
 });

@@ -8,23 +8,11 @@ import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/them
 import {PingDialog} from '../src/components/PingDialog';
 import {CalendarScreen} from '../src/components/CalendarScreen';
 import {SummaryNote} from '../src/components/SummaryNote';
+import {TaskTitle} from '../src/components/TaskTitle';
 
 type Tab='home'|'tasks'|'calendar';
 const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
 const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-function TaskTitle({title,completed,colors,style}:{title:string;completed:boolean;colors:ThemeColors;style?:TextStyle}){
-  const progress=useRef(new Animated.Value(completed?0:1)).current;
-  const [width,setWidth]=useState(0);
-  React.useEffect(()=>{
-    const animation=Animated.timing(progress,{toValue:completed?1:0,duration:250,useNativeDriver:false});
-    animation.start();
-    return()=>animation.stop();
-  },[completed,progress]);
-  return <View style={{alignSelf:'flex-start',maxWidth:'100%'}}>
-    <Text onLayout={event=>setWidth(event.nativeEvent.layout.width)} style={[{color:completed?colors.muted:colors.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3,opacity:completed?0.82:1},style]}>{title}</Text>
-    {completed&&width>0?<Animated.View pointerEvents="none" style={{position:'absolute',left:0,top:'50%',height:2.5,borderRadius:2,backgroundColor:colors.accent,width:progress.interpolate({inputRange:[0,1],outputRange:[0,width]})}}/>:null}
-  </View>;
-}
 const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'];
 export default function Home(){
   const {colors:c,appearance}=useAppTheme();
