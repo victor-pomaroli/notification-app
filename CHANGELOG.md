@@ -1,0 +1,67 @@
+# Changelog
+
+Todas as mudanças relevantes do Ping ficam registradas aqui.
+
+O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto usa [Versionamento Semântico](https://semver.org/lang/pt-BR/).
+
+## Como versionar
+
+- **MAJOR** (`2.0.0`): mudança que quebra dados ou hábitos existentes (ex.: migração de banco sem volta, remoção de recurso).
+- **MINOR** (`1.2.0`): recurso novo ou mudança visível de comportamento.
+- **PATCH** (`1.1.1`): correção ou ajuste pequeno, sem recurso novo.
+
+A cada versão:
+
+1. Mova os itens de **Não lançado** para uma nova seção `## [x.y.z] — AAAA-MM-DD`.
+2. Atualize `version` em `package.json` e `expo.version` em `app.json`.
+3. Atualize `expo.android.versionCode` em `app.json` para `MAJOR*10000 + MINOR*100 + PATCH` (ex.: `1.2.3` → `10203`). O código precisa sempre subir para o Android aceitar a atualização.
+4. Depois do merge na `main`, crie e envie a tag da versão (ex.: `git tag v1.2.0 && git push origin v1.2.0`).
+
+## [Não lançado]
+
+_Nada ainda._
+
+## [1.1.0] — 2026-11-05
+
+Primeira versão numerada depois do MVP. Reúne os PRs #1 a #4 e #10 a #15.
+
+### Adicionado
+- **Eventos:** criação e edição com início, término opcional, local e até 3 avisos antes de começar; cartão com quanto falta; bolinha azul no calendário.
+- **Rotinas** diárias com histórico, pausa e encerramento (*Minhas rotinas*).
+- **Tarefas associadas** (etapas) dentro de uma tarefa principal.
+- **Calendário** mensal com lista do dia; o **+** cria no dia selecionado.
+- **Widget Android** com próximas tarefas e concluídas do dia, que conclui ou reabre direto pela caixa.
+- **Notificações contextuais** por assunto, com três personalidades (Debochado, Sem Paciência, De Boa), nome e forma de tratamento.
+- **Onboarding** de 4 passos e tema claro suave além do escuro.
+- Nota de resumo na aba Hoje com rótulo que muda com o estado do dia.
+- Confetes ao chegar na aba Hoje com tudo concluído.
+- Tocar numa notificação ou numa tarefa do widget abre a aba Hoje com a tarefa destacada.
+- `PRODUCT.md` com a visão de produto e este changelog.
+
+### Alterado
+- Visual mais limpo em Hoje e Tarefas: sem linhas divisórias, um sinal por cartão, traço de urgência e seções vazias escondidas.
+- Aba Tarefas organizada em blocos **Hoje** e **Próximos**, com atalho visível para as rotinas.
+- Concluídas antes de hoje saem de Hoje e Tarefas (continuam no Calendário); seções por data e nova ordenação.
+- O widget segue o visual e o tema do app e responde mais rápido ao toque.
+- Editor de evento sem "Qual o assunto?" e com menos opções de aviso.
+- Todos os alertas nativos do Android foram trocados pelo diálogo do Ping.
+- Ajustes saiu das abas e foi para o cabeçalho.
+
+### Corrigido
+- Widget piscando em branco ao atualizar.
+- Build do APK no CI (Linux) e falha ao iniciar relacionada ao WorkManager.
+
+## [1.0.2] — 2026-11-01
+### Alterado
+- Base do Expo migrada para o SDK 58.
+
+## [1.0.1] — 2026-11-01
+### Corrigido
+- Dependências nativas do Expo alinhadas ao SDK.
+
+## [1.0.0] — 2026-11-01
+### Adicionado
+- MVP: lista de tarefas com SQLite local, tema escuro e notificação no vencimento.
+
+[Não lançado]: https://github.com/victor-pomaroli/notification-app/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/victor-pomaroli/notification-app/releases/tag/v1.1.0
