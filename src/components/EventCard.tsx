@@ -29,40 +29,42 @@ export function alertsLabel(task:Pick<Task,'alert_offsets'>){
 }
 
 /**
- * Evento: sem caixa de concluir e sem risco. Horário à esquerda com uma barra azul,
- * local e avisos embaixo do título, e um selo de estado à direita.
+ * Evento: sem caixa de concluir e sem risco. Horário à esquerda com a barra azul (o único
+ * sinal de "evento"), local/assunto/aviso numa linha só embaixo do título. O selo só aparece
+ * quando é urgente (AGORA ou faltando menos de 1h); a data já vem no título da seção.
  */
 export function EventCard({task,now,colors:c,appearance,onPress,onLongPress}:{task:Task;now:number;colors:ThemeColors;appearance:Appearance;onPress?:()=>void;onLongPress?:()=>void}){
   const status=eventStatus(task,now);
+  const urgent=status.live||(!status.past&&task.due_at-now<3600000);
   const topic=categoryColors[appearance][task.category]??categoryColors[appearance].general;
+  const offsets=eventOffsets(task);
+  const meta=[task.location?.trim(),offsets.length?'aviso '+alertsLabel(task):null].filter(Boolean).join(' · ');
   return <Pressable accessibilityRole="button" accessibilityLabel={`Evento ${task.title}, ${hhmm(task.due_at)}, ${status.label.toLowerCase()}`} onPress={onPress} onLongPress={onLongPress}
-    style={[styles.row,{borderBottomColor:c.border,opacity:status.past?0.55:1}]}>
+    style={[styles.row,{opacity:status.past?0.5:1}]}>
     <View style={styles.time}>
       <Text style={[styles.start,{color:c.text}]}>{hhmm(task.due_at)}</Text>
       {task.ends_at?<Text style={[styles.end,{color:c.muted}]}>{hhmm(task.ends_at)}</Text>:null}
     </View>
     <View style={[styles.bar,{backgroundColor:c.event}]}/>
-    <View style={{flex:1,minWidth:0,gap:6}}>
+    <View style={{flex:1,minWidth:0,gap:4}}>
       <Text numberOfLines={2} style={[styles.title,{color:c.text}]}>{task.title}</Text>
-      {task.location?.trim()?<Text numberOfLines={1} style={[styles.meta,{color:c.muted}]}>📍 {task.location.trim()}</Text>:null}
-      <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}>
-        <View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[task.category]??'Geral'}</Text></View>
-        <Text style={[styles.meta,{color:c.muted}]}>🔔 {alertsLabel(task)}</Text>
-      </View>
+      {meta||task.category!=='general'?<Text numberOfLines={1} style={[styles.meta,{color:c.muted}]}>
+        {task.category!=='general'?<Text style={{color:topic.text,fontWeight:'700'}}>{categories[task.category]}{meta?' · ':''}</Text>:null}{meta}
+      </Text>:null}
     </View>
-    <View style={[styles.badge,status.live?{backgroundColor:c.event}:{borderWidth:1,borderColor:status.past?c.border:c.event}]}>
-      <Text style={[styles.badgeText,{color:status.live?c.background:status.past?c.muted:c.event}]}>{status.label}</Text>
-    </View>
+    {urgent?<View style={[styles.badge,status.live?{backgroundColor:c.event}:{borderWidth:1,borderColor:c.event}]}>
+      <Text style={[styles.badgeText,{color:status.live?c.background:c.event}]}>{status.label}</Text>
+    </View>:null}
   </Pressable>;
 }
 const styles=StyleSheet.create({
-  row:{flexDirection:'row',alignItems:'center',gap:11,paddingVertical:16,borderBottomWidth:1},
+  row:{flexDirection:'row',alignItems:'center',gap:11,paddingVertical:13},
   time:{width:46,alignItems:'flex-start'},
-  start:{fontSize:15,fontWeight:'900',letterSpacing:-0.3},
-  end:{fontSize:12,fontWeight:'700',marginTop:3},
+  start:{fontSize:15,fontWeight:'800',letterSpacing:-0.3},
+  end:{fontSize:12,fontWeight:'600',marginTop:3},
   bar:{width:3,alignSelf:'stretch',borderRadius:2},
-  title:{fontSize:17,fontWeight:'800',letterSpacing:-0.3},
+  title:{fontSize:17,fontWeight:'700',letterSpacing:-0.3},
   meta:{fontSize:12},
-  badge:{borderRadius:5,paddingHorizontal:7,paddingVertical:5},
+  badge:{borderRadius:5,paddingHorizontal:7,paddingVertical:4},
   badgeText:{fontSize:10,fontWeight:'900',letterSpacing:0.5},
 });

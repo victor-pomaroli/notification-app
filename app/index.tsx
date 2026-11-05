@@ -4,7 +4,7 @@ import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {localDay,Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,deleteTask} from '../src/store';
 import {categories,TaskCategory} from '../src/templates';
-import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
+import {useAppTheme,ThemeColors,categoryColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 import {CalendarScreen} from '../src/components/CalendarScreen';
 import {SummaryNote} from '../src/components/SummaryNote';
@@ -13,8 +13,18 @@ import {sortTasks,sectionTasks} from '../src/task-order';
 import {EventCard} from '../src/components/EventCard';
 
 type Tab='home'|'tasks'|'calendar';
-const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
 const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+const hhmm=(ms:number)=>new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const shortDay=(ms:number)=>new Date(ms).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','');
+/** "há 21 min", "há 3 h", "há 2 dias": quanto tempo uma tarefa está atrasada. */
+function ago(ms:number,now:number){
+  const min=Math.max(1,Math.floor((now-ms)/60000));
+  if(min<60)return `há ${min} min`;
+  const h=Math.floor(min/60);if(h<24)return `há ${h} h`;
+  const d=Math.floor(h/24);return `há ${d} ${d===1?'dia':'dias'}`;
+}
+/** O que o cartão precisa dizer sobre a data: na seção de um dia (ou no Hoje) a data já está implícita. */
+type CardContext={dayKnown?:boolean};
 const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'];
 export default function Home(){
   const {colors:c,appearance}=useAppTheme();
@@ -43,6 +53,7 @@ export default function Home(){
   const [deleteTarget,setDeleteTarget]=useState<Task|null>(null);
   const [busyDelete,setBusyDelete]=useState(false);
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
+  const [showDone,setShowDone]=useState(false);
   const router=useRouter();
   const insets=useSafeAreaInsets();
   const refresh=useCallback(async()=>{await archiveOldCompletedTasks();const all=await listTasks();setTasks(all);setVisibleTaskCount(50);setNow(Date.now());},[]);
@@ -94,27 +105,35 @@ export default function Home(){
     finally{setBusyDelete(false);}
   }
   /** Cartões das tarefas principais na ordem dada, cada uma seguida das suas subtarefas (buscadas em `pool`). */
-  function groupedCards(parents:Task[],pool:Task[]=tasks){return parents.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...pool.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
-  function card(t:Task){
+  function groupedCards(parents:Task[],pool:Task[]=tasks,ctx:CardContext={}){return parents.filter(t=>!t.parent_id).flatMap(parent=>[card(parent,ctx),...pool.filter(child=>child.parent_id===parent.id).map(child=>card(child,ctx))]);}
+  /**
+   * Cartão de tarefa enxuto: um só sinal por cartão. Atraso = caixa e horário em vermelho
+   * (a seção já diz "passou da hora"); prioridade só aparece quando é ALTA; o assunto
+   * "Geral" (o padrão) não aparece; a data some quando a seção já é daquele dia.
+   */
+  function card(t:Task,ctx:CardContext={}){
     if(t.parent_id)return subCard(t);
     if(t.kind==='event')return <EventCard key={t.id} task={t} now={now} colors={c} appearance={appearance} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}/>;
     const late=!t.completed&&!t.daily&&!t.no_due&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
-    return <Pressable key={t.id} style={[s.task,t.parent_id?{marginLeft:28,paddingLeft:12,borderLeftWidth:2,borderLeftColor:c.accentSoft,backgroundColor:c.surface}:undefined,late?{borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
-      {late?<View pointerEvents="none" style={{position:'absolute',left:-12,right:-12,top:5,bottom:5,backgroundColor:appearance==='dark'?'#34201E':'#F8E2DC',borderRadius:10,borderWidth:1,borderColor:appearance==='dark'?'#77423D':'#E5B0A5'}}/>:null}
-      {t.parent_id?<Text style={{color:c.accent,fontSize:17}}>↳</Text>:null}
-      <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} onPress={()=>toggle(t)} style={[s.check,late?{borderColor:appearance==='dark'?'#FF887B':'#B83931'}:undefined,!!t.completed?s.checked:undefined]}>
+    const when=t.daily?(t.no_due?'↻ diária':'↻ diária · '+hhmm(t.due_at))
+      :t.no_due?(ctx.dayKnown?'':'Sem data')
+      :late?`${isToday(t.due_at)?hhmm(t.due_at):shortDay(t.due_at)} · ${ago(t.due_at,now)}`
+      :ctx.dayKnown?hhmm(t.due_at):formatDate(t.due_at);
+    const showTopic=t.category!=='general'&&!!categories[t.category];
+    return <Pressable key={t.id} style={s.task} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+      <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} hitSlop={8} onPress={()=>toggle(t)} style={[s.check,late?{borderColor:c.danger}:undefined,!!t.completed?s.checked:undefined]}>
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
-      <View style={{flex:1,gap:7}}>
-        <TaskTitle key={`${t.id}-${t.completed}`} title={t.title} completed={!!t.completed} colors={c} style={late?{color:appearance==='dark'?'#FFB5A9':'#A82F27',fontWeight:'900'}:undefined}/>
+      <View style={{flex:1,gap:4}}>
+        <TaskTitle key={`${t.id}-${t.completed}`} title={t.title} completed={!!t.completed} colors={c}/>
         {t.description?.trim()?<Text style={s.taskDescription} numberOfLines={2}>{t.description.trim()}</Text>:null}
-        <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:7}}><View style={{backgroundColor:topic.surface,borderRadius:5,paddingHorizontal:8,paddingVertical:4}}><Text style={{color:topic.text,fontSize:10,fontWeight:'800'}}>{categories[t.category]??'Geral'}</Text></View><Text style={s.meta}>{t.daily?(t.no_due?'↻ DIÁRIA':'↻ DIÁRIA · '+new Date(t.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})):t.no_due?'Sem data':formatDate(t.due_at)}</Text></View>
+        {showTopic||when?<Text style={s.meta} numberOfLines={1}>
+          {showTopic?<Text style={{color:topic.text,fontWeight:'700'}}>{categories[t.category]}{when?' · ':''}</Text>:null}
+          {when?<Text style={late?{color:c.danger,fontWeight:'700'}:undefined}>{when}</Text>:null}
+        </Text>:null}
       </View>
-      <View style={s.priorityWrap}>
-        {late?<View style={{backgroundColor:appearance==='dark'?'#FF887B':'#B83931',paddingHorizontal:7,paddingVertical:5,borderRadius:5}}><Text style={{color:appearance==='dark'?'#261412':'#FFFFFF',fontSize:10,fontWeight:'900'}}>⚠ ATRASADA</Text></View>:<Text style={s.priority}>{priorityLabel[t.priority]}</Text>}
-        <View style={[s.priorityLine,{backgroundColor:late?(appearance==='dark'?'#FF887B':'#B83931'):priorityColors[t.priority]}]}/>
-      </View>
+      {t.priority==='high'&&!t.completed?<Text style={s.priority}>ALTA</Text>:null}
     </Pressable>;
   }
   /**
@@ -132,6 +151,11 @@ export default function Home(){
     </Pressable>;
   }
   const empty=(message:string)=><Text style={s.empty}>{message}</Text>;
+  /** Título de seção discreto: rótulo cinza + contagem, sem linha. Só "passou da hora" ganha cor. */
+  const sectionHead=(label:string,count:number,color?:string)=><View style={s.sectionHead}>
+    <Text style={[s.section,color?{color}:undefined]}>{label}<Text style={s.sectionCount}>{'  ·  '+count}</Text></Text>
+  </View>;
+  const homeHasPending=overdue.length+agenda.length+upcoming.length>0;
   return <View style={s.root}>
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
@@ -151,33 +175,31 @@ export default function Home(){
       {page==='home'?<Text style={s.heading}>{'Seu dia.\nSem desculpas.'}</Text>:page==='calendar'?<Text style={s.heading}>{'Seu tempo.\nSeu ritmo.'}</Text>:null}
       {page==='home'?<>
         <SummaryNote appearance={appearance} page={c.background} left={overdue.length+todayAhead.length} overdue={overdue.length} today={todayAhead.length} done={completedToday.length}/>
-        {agenda.length?<>
-          <View style={s.sectionHead}><Text style={[s.section,{color:c.event}]}>AGENDA DE HOJE</Text><Text style={[s.sectionCount,{color:c.event}]}>{String(agenda.length).padStart(2,'0')}</Text></View>
-          {groupedCards(agenda)}
-        </>:null}
-        <View style={s.sectionHead}><Text style={s.section}>PASSOU DA HORA</Text><Text style={s.sectionCount}>{String(overdue.length).padStart(2,'0')}</Text></View>
-        {overdue.length?groupedCards(overdue):empty('Nada atrasado. Pode comemorar sem exagerar.')}
-        <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
-        {upcoming.length?groupedCards(upcoming.slice(0,8)):empty('Nada mais pra hoje. Que paz suspeita.')}
-        <View style={s.sectionHead}><Text style={s.section}>CONCLUÍDAS HOJE</Text><Text style={s.sectionCount}>{String(completedToday.length).padStart(2,'0')}</Text></View>
-        {completedToday.length?groupedCards(completedToday):empty('Nada concluído hoje. Ainda dá tempo.')}
-      </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks} selected={calendarDay} onSelect={setCalendarDay}/>:<>
-        <View style={s.tasksHead}>
-          <Text style={s.section}>TODAS AS TAREFAS</Text>
-          <Text style={[s.sectionCount,{marginLeft:9}]}>{String(filteredTasks.length).padStart(2,'0')}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Abrir minhas rotinas" hitSlop={10} onPress={()=>router.push('/routines')} style={s.routinesLink}>
-            <Text style={s.routinesLinkText}>↻ ROTINAS ›</Text>
+        {/* Ordem de urgência: atrasadas → agenda → radar. Seções vazias não aparecem. */}
+        {overdue.length?<>{sectionHead('PASSOU DA HORA',overdue.length,c.danger)}{groupedCards(overdue)}</>:null}
+        {agenda.length?<>{sectionHead('AGENDA DE HOJE',agenda.length)}{groupedCards(agenda,tasks,{dayKnown:true})}</>:null}
+        {upcoming.length?<>{sectionHead('NO RADAR',upcoming.length)}{groupedCards(upcoming.slice(0,8),tasks,{dayKnown:true})}</>:null}
+        {!homeHasPending?empty(completedToday.length?'Tudo feito por hoje. Que paz suspeita.':'Nada pra hoje. Toque no + para criar uma tarefa.'):null}
+        {completedToday.length?<>
+          <Pressable accessibilityRole="button" accessibilityState={{expanded:showDone}} onPress={()=>setShowDone(v=>!v)} style={s.doneToggle}>
+            <Text style={s.doneToggleText}>✓  {completedToday.length} {completedToday.length===1?'concluída':'concluídas'} hoje</Text>
+            <Text style={s.doneToggleText}>{showDone?'⌃':'⌄'}</Text>
           </Pressable>
-        </View>
-        <View style={s.filters}><ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row',gap:7,paddingVertical:2,paddingRight:4}}
-          onTouchStart={()=>setFiltersTouched(true)} onTouchEnd={()=>setFiltersTouched(false)} onTouchCancel={()=>setFiltersTouched(false)} onScrollEndDrag={()=>setFiltersTouched(false)}>{([{key:'all',label:'Todas'},{key:'event',label:'Eventos'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|'event'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:item.key==='event'?{text:c.event,surface:c.surfaceRaised}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={{paddingHorizontal:13,paddingVertical:8,borderRadius:999,borderWidth:1,borderColor:active?topic.text:c.border,backgroundColor:active?topic.surface:c.surface}}><Text style={{color:active?topic.text:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</ScrollView></View>
+          {showDone?groupedCards(completedToday):null}
+        </>:null}
+      </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks} selected={calendarDay} onSelect={setCalendarDay}/>:<>
+        {/* Os filtros são o cabeçalho da aba; "Rotinas" é o último chip da faixa. */}
+        <View style={s.filters}><ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row',alignItems:'center',gap:4,paddingVertical:2,paddingRight:4}}
+          onTouchStart={()=>setFiltersTouched(true)} onTouchEnd={()=>setFiltersTouched(false)} onTouchCancel={()=>setFiltersTouched(false)} onScrollEndDrag={()=>setFiltersTouched(false)}>{([{key:'all',label:'Todas'},{key:'event',label:'Eventos'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|'event'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:item.key==='event'?{text:c.event,surface:c.surfaceRaised}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={[s.chip,active?{backgroundColor:topic.surface}:undefined]}><Text style={[s.chipText,active?{color:topic.text}:undefined]}>{item.label}{active&&item.key==='all'?'  '+filteredTasks.length:''}</Text></Pressable>;})}
+          <View style={s.chipDivider}/>
+          <Pressable accessibilityRole="button" accessibilityLabel="Abrir minhas rotinas" onPress={()=>router.push('/routines')} style={s.chip}><Text style={[s.chipText,{color:c.accent}]}>↻ Rotinas ›</Text></Pressable>
+        </ScrollView></View>
         {filteredTasks.length?sectionTasks(filteredPage.filter(t=>!t.parent_id),now).map(section=><React.Fragment key={section.key}>
-          <View style={s.sectionHead}><Text style={[s.section,section.key==='overdue'?{color:appearance==='dark'?'#FF887B':'#B83931'}:undefined]}>{section.label}</Text><Text style={s.sectionCount}>{String(section.tasks.length).padStart(2,'0')}</Text></View>
-          {groupedCards(section.tasks,filteredPage)}
+          {sectionHead(section.label,section.tasks.length,section.key==='overdue'?c.danger:undefined)}
+          {groupedCards(section.tasks,filteredPage,{dayKnown:/^d\d/.test(section.key)})}
         </React.Fragment>):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':taskCategoryFilter==='event'?'Nenhum evento marcado. Toque no + e escolha Evento.':'Nenhuma tarefa neste tópico.')}
       </>}
       {page==='tasks'&&filteredTasks.length>visibleTaskCount?<Pressable accessibilityRole="button" onPress={loadMoreTasks} style={{backgroundColor:c.surface,borderRadius:9,padding:16,alignItems:'center',marginTop:20}}><Text style={{color:c.accent,fontWeight:'800'}}>{loadingPage?'CARREGANDO...':`CARREGAR MAIS (${filteredTasks.length-visibleTaskCount} RESTANTES)`}</Text></Pressable>:null}
-      {page!=='calendar'?<Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>:null}
       </>
       </Animated.ScrollView>
       <Animated.View pointerEvents="box-none" style={[s.sharedBrand,{
@@ -217,28 +239,28 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   settingsButton:{width:38,height:38,borderRadius:10,backgroundColor:c.surface,alignItems:'center',justifyContent:'center',marginLeft:5},
   settingsIcon:{color:c.accent,fontSize:23,fontWeight:'700'},
   eyebrow:{color:c.accent,fontSize:10,fontWeight:'900',letterSpacing:2.5,marginBottom:13},
-  heading:{color:c.text,fontSize:40,fontWeight:'900',lineHeight:43,letterSpacing:-2,marginBottom:22},
-  sectionHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderBottomWidth:1,borderBottomColor:c.border,paddingBottom:12,marginTop:12,marginBottom:5},
-  section:{color:c.text,fontSize:12,fontWeight:'900',letterSpacing:1.5},sectionCount:{color:c.accent,fontSize:14,fontWeight:'900'},
-  task:{paddingVertical:19,flexDirection:'row',alignItems:'center',gap:14,borderBottomWidth:1,borderBottomColor:c.border},
+  heading:{color:c.text,fontSize:30,fontWeight:'900',lineHeight:33,letterSpacing:-1.4,marginBottom:14},
+  sectionHead:{marginTop:26,marginBottom:2},
+  section:{color:c.muted,fontSize:11,fontWeight:'800',letterSpacing:1.3},sectionCount:{fontWeight:'600'},
+  task:{paddingVertical:12,flexDirection:'row',alignItems:'center',gap:14},
   check:{width:27,height:27,borderRadius:6,borderWidth:2,borderColor:c.muted,alignItems:'center',justifyContent:'center'},
-  subTask:{flexDirection:'row',alignItems:'center',gap:12,marginLeft:13,paddingLeft:28,paddingRight:4,paddingVertical:11,borderLeftWidth:2,borderLeftColor:c.accentSoft,borderBottomWidth:1,borderBottomColor:c.border},
+  subTask:{flexDirection:'row',alignItems:'center',gap:12,marginLeft:13,paddingLeft:28,paddingRight:4,paddingVertical:8,borderLeftWidth:2,borderLeftColor:c.accentSoft},
   subCheck:{width:22,height:22,borderRadius:5},
   checked:{backgroundColor:c.accent,borderColor:c.accent},checkText:{color:c.background,fontWeight:'900',fontSize:16},
   taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},
   taskDescription:{color:c.muted,fontSize:13,lineHeight:18},
-  meta:{color:c.muted,fontSize:11},late:{color:c.danger,fontSize:10,fontWeight:'900',letterSpacing:0.8},
-  priority:{color:c.muted,fontSize:9,fontWeight:'800'},
-  priorityWrap:{alignItems:'center',justifyContent:'center',gap:6},
-  priorityLine:{width:34,height:5,borderRadius:3},empty:{color:c.muted,paddingVertical:23,fontSize:13,lineHeight:20},
-  tasksHead:{flexDirection:'row',alignItems:'center',marginTop:12,marginBottom:14},
-  routinesLink:{marginLeft:'auto',borderWidth:1,borderColor:c.border,borderRadius:999,paddingHorizontal:11,paddingVertical:6},
-  routinesLinkText:{color:c.accent,fontSize:11,fontWeight:'900',letterSpacing:0.8},
-  filters:{borderBottomWidth:1,borderBottomColor:c.border,paddingBottom:12,marginBottom:5},
-  tip:{color:c.muted,fontSize:9,letterSpacing:1.1,marginTop:35,textAlign:'center'},
+  meta:{color:c.muted,fontSize:12},
+  priority:{color:c.warning,fontSize:10,fontWeight:'900',letterSpacing:0.6},
+  empty:{color:c.muted,paddingVertical:23,fontSize:13,lineHeight:20},
+  filters:{marginTop:4,marginHorizontal:-8},
+  chip:{paddingHorizontal:12,paddingVertical:7,borderRadius:999},
+  chipText:{color:c.muted,fontSize:13,fontWeight:'700'},
+  chipDivider:{width:1,height:16,backgroundColor:c.border,marginHorizontal:4},
+  doneToggle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:26,paddingVertical:12,paddingHorizontal:14,borderRadius:10,backgroundColor:c.surface},
+  doneToggleText:{color:c.muted,fontSize:13,fontWeight:'700'},
   add:{position:'absolute',bottom:91,right:23,backgroundColor:c.accent,height:61,width:61,borderRadius:12,alignItems:'center',justifyContent:'center',elevation:7},
   plus:{color:c.background,fontSize:38,fontWeight:'500',lineHeight:47},
-  nav:{height:75,backgroundColor:c.surface,flexDirection:'row',borderTopWidth:1,borderTopColor:c.border,paddingHorizontal:12},
+  nav:{height:75,backgroundColor:c.surface,flexDirection:'row',paddingHorizontal:12},
   navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:7},navSelected:{},navText:{color:c.muted,fontSize:9,fontWeight:'900',letterSpacing:0.7},
   navActive:{color:c.accent},dot:{width:16,height:3,borderRadius:3,backgroundColor:c.accent},
 });
