@@ -51,8 +51,8 @@ export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){
   await syncDailyTasks();
   const db=await ready;
   const roots=category
-    ?await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND ${HIDE_DONE_BEFORE_TODAY} AND category=? ORDER BY completed ASC,no_due ASC,due_at ASC,id ASC LIMIT ? OFFSET ?`,startOfToday(),category,limit,offset)
-    :await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND ${HIDE_DONE_BEFORE_TODAY} ORDER BY completed ASC,no_due ASC,due_at ASC,id ASC LIMIT ? OFFSET ?`,startOfToday(),limit,offset);
+    ?await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND ${HIDE_DONE_BEFORE_TODAY} AND category=? ORDER BY completed ASC,daily DESC,no_due ASC,CASE WHEN no_due=1 THEN (CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END) ELSE due_at END ASC,id ASC LIMIT ? OFFSET ?`,startOfToday(),category,limit,offset)
+    :await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IS NULL AND archived_at IS NULL AND (daily=0 OR daily_active=1) AND ${HIDE_DONE_BEFORE_TODAY} ORDER BY completed ASC,daily DESC,no_due ASC,CASE WHEN no_due=1 THEN (CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END) ELSE due_at END ASC,id ASC LIMIT ? OFFSET ?`,startOfToday(),limit,offset);
   if(!roots.length)return [];
   const ids=roots.map(root=>root.id);
   const children=await db.getAllAsync<Task>(`SELECT * FROM tasks WHERE parent_id IN (${ids.map(()=>'?').join(',')}) AND archived_at IS NULL ORDER BY id ASC`,...ids);

@@ -9,6 +9,7 @@ import {PingDialog} from '../src/components/PingDialog';
 import {CalendarScreen} from '../src/components/CalendarScreen';
 import {SummaryNote} from '../src/components/SummaryNote';
 import {TaskTitle} from '../src/components/TaskTitle';
+import {sortTasks,sectionTasks} from '../src/task-order';
 
 type Tab='home'|'tasks'|'calendar';
 const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
@@ -64,11 +65,11 @@ export default function Home(){
   const roots=tasks.filter(t=>!t.parent_id);
   const pending=roots.filter(t=>!t.completed);
   // Tarefas sem data nunca ficam atrasadas nem contam como "pra hoje"; aparecem no radar.
-  const overdue=pending.filter(t=>!t.daily&&!t.no_due&&t.due_at<now);
+  const overdue=pending.filter(t=>!t.daily&&!t.no_due&&t.due_at<now).sort((a,b)=>a.due_at-b.due_at||a.id-b.id);
   // Radar = o que ainda vem hoje: rotinas, tarefas sem data e as que vencem mais tarde hoje.
   // Tarefas de outros dias ficam em Tarefas e no Calendário.
   const isToday=(ms:number)=>new Date(ms).toDateString()===new Date(now).toDateString();
-  const upcoming=pending.filter(t=>t.daily||t.no_due||(t.due_at>=now&&isToday(t.due_at)));
+  const upcoming=sortTasks(pending.filter(t=>t.daily||t.no_due||(t.due_at>=now&&isToday(t.due_at))));
   const today=pending.filter(t=>t.daily||(!t.no_due&&new Date(t.due_at).toDateString()===new Date(now).toDateString()));
   const todayAhead=today.filter(t=>!overdue.includes(t));
   const completedToday=roots.filter(t=>!!t.completed&&t.completed_at!=null&&new Date(t.completed_at).toDateString()===new Date(now).toDateString())
@@ -85,7 +86,8 @@ export default function Home(){
     catch(e){setDeleteTarget(null);setFeedback({title:'Não foi possível excluir.',message:String(e)});}
     finally{setBusyDelete(false);}
   }
-  function groupedCards(items:Task[]){const children=items.filter(t=>t.parent_id);return items.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...children.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
+  /** Cartões das tarefas principais na ordem dada, cada uma seguida das suas subtarefas (buscadas em `pool`). */
+  function groupedCards(parents:Task[],pool:Task[]=tasks){return parents.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...pool.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
   function card(t:Task){
     if(t.parent_id)return subCard(t);
     const late=!t.completed&&!t.daily&&!t.no_due&&t.due_at<now;
@@ -142,11 +144,11 @@ export default function Home(){
       {page==='home'?<>
         <SummaryNote appearance={appearance} page={c.background} left={overdue.length+todayAhead.length} overdue={overdue.length} today={todayAhead.length} done={completedToday.length}/>
         <View style={s.sectionHead}><Text style={s.section}>PASSOU DA HORA</Text><Text style={s.sectionCount}>{String(overdue.length).padStart(2,'0')}</Text></View>
-        {overdue.length?groupedCards(tasks.filter(t=>overdue.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada atrasado. Pode comemorar sem exagerar.')}
+        {overdue.length?groupedCards(overdue):empty('Nada atrasado. Pode comemorar sem exagerar.')}
         <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
-        {upcoming.length?groupedCards(tasks.filter(t=>upcoming.slice(0,8).some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada mais pra hoje. Que paz suspeita.')}
+        {upcoming.length?groupedCards(upcoming.slice(0,8)):empty('Nada mais pra hoje. Que paz suspeita.')}
         <View style={s.sectionHead}><Text style={s.section}>CONCLUÍDAS HOJE</Text><Text style={s.sectionCount}>{String(completedToday.length).padStart(2,'0')}</Text></View>
-        {completedToday.length?groupedCards(tasks.filter(t=>completedToday.some(parent=>parent.id===t.id||parent.id===t.parent_id))):empty('Nada concluído hoje. Ainda dá tempo.')}
+        {completedToday.length?groupedCards(completedToday):empty('Nada concluído hoje. Ainda dá tempo.')}
       </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks} selected={calendarDay} onSelect={setCalendarDay}/>:<>
         <View style={s.tasksHead}>
           <Text style={s.section}>TODAS AS TAREFAS</Text>
@@ -157,7 +159,10 @@ export default function Home(){
         </View>
         <View style={s.filters}><ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row',gap:7,paddingVertical:2,paddingRight:4}}
           onTouchStart={()=>setFiltersTouched(true)} onTouchEnd={()=>setFiltersTouched(false)} onTouchCancel={()=>setFiltersTouched(false)} onScrollEndDrag={()=>setFiltersTouched(false)}>{([{key:'all',label:'Todas'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={{paddingHorizontal:13,paddingVertical:8,borderRadius:999,borderWidth:1,borderColor:active?topic.text:c.border,backgroundColor:active?topic.surface:c.surface}}><Text style={{color:active?topic.text:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</ScrollView></View>
-        {filteredTasks.length?groupedCards(filteredPage):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')}
+        {filteredTasks.length?sectionTasks(filteredPage.filter(t=>!t.parent_id),now).map(section=><React.Fragment key={section.key}>
+          <View style={s.sectionHead}><Text style={[s.section,section.key==='overdue'?{color:appearance==='dark'?'#FF887B':'#B83931'}:undefined]}>{section.label}</Text><Text style={s.sectionCount}>{String(section.tasks.length).padStart(2,'0')}</Text></View>
+          {groupedCards(section.tasks,filteredPage)}
+        </React.Fragment>):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')}
       </>}
       {page==='tasks'&&filteredTasks.length>visibleTaskCount?<Pressable accessibilityRole="button" onPress={loadMoreTasks} style={{backgroundColor:c.surface,borderRadius:9,padding:16,alignItems:'center',marginTop:20}}><Text style={{color:c.accent,fontWeight:'800'}}>{loadingPage?'CARREGANDO...':`CARREGAR MAIS (${filteredTasks.length-visibleTaskCount} RESTANTES)`}</Text></Pressable>:null}
       {page!=='calendar'?<Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>:null}
