@@ -1,8 +1,8 @@
 import React from 'react';
 import {View,Text,Pressable,StyleSheet} from 'react-native';
 import {Task,eventOffsets} from '../store';
-import {ThemeColors,Appearance,categoryColors} from '../theme';
-import {categories,eventAlertOptions} from '../templates';
+import {ThemeColors,Appearance} from '../theme';
+import {eventAlertOptions} from '../templates';
 
 const hhmm=(ms:number)=>new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 /** Sem horário de término, o evento conta como "acontecendo" durante a primeira hora. */
@@ -30,15 +30,14 @@ export function alertsLabel(task:Pick<Task,'alert_offsets'>){
 
 /**
  * Evento: sem caixa de concluir e sem risco. Horário à esquerda com a barra azul (o único
- * sinal de "evento"), local/assunto/aviso numa linha só embaixo do título. O selo só aparece
- * quando é urgente (AGORA ou faltando menos de 1h); a data já vem no título da seção.
+ * sinal de "evento"), 📍 local e aviso numa linha só embaixo do título. À direita, quanto
+ * falta: texto azul simples, que vira selo só quando é urgente (AGORA ou menos de 1h).
  */
 export function EventCard({task,now,colors:c,appearance,onPress,onLongPress}:{task:Task;now:number;colors:ThemeColors;appearance:Appearance;onPress?:()=>void;onLongPress?:()=>void}){
   const status=eventStatus(task,now);
   const urgent=status.live||(!status.past&&task.due_at-now<3600000);
-  const topic=categoryColors[appearance][task.category]??categoryColors[appearance].general;
+  const location=task.location?.trim();
   const offsets=eventOffsets(task);
-  const meta=[task.location?.trim(),offsets.length?'aviso '+alertsLabel(task):null].filter(Boolean).join(' · ');
   return <Pressable accessibilityRole="button" accessibilityLabel={`Evento ${task.title}, ${hhmm(task.due_at)}, ${status.label.toLowerCase()}`} onPress={onPress} onLongPress={onLongPress}
     style={[styles.row,{opacity:status.past?0.5:1}]}>
     <View style={styles.time}>
@@ -48,13 +47,13 @@ export function EventCard({task,now,colors:c,appearance,onPress,onLongPress}:{ta
     <View style={[styles.bar,{backgroundColor:c.event}]}/>
     <View style={{flex:1,minWidth:0,gap:4}}>
       <Text numberOfLines={2} style={[styles.title,{color:c.text}]}>{task.title}</Text>
-      {meta||task.category!=='general'?<Text numberOfLines={1} style={[styles.meta,{color:c.muted}]}>
-        {task.category!=='general'?<Text style={{color:topic.text,fontWeight:'700'}}>{categories[task.category]}{meta?' · ':''}</Text>:null}{meta}
+      {location||offsets.length?<Text numberOfLines={1} style={[styles.meta,{color:c.muted}]}>
+        {location?'📍 '+location:''}{location&&offsets.length?'  ·  ':''}{offsets.length?'aviso '+alertsLabel(task):''}
       </Text>:null}
     </View>
     {urgent?<View style={[styles.badge,status.live?{backgroundColor:c.event}:{borderWidth:1,borderColor:c.event}]}>
       <Text style={[styles.badgeText,{color:status.live?c.background:c.event}]}>{status.label}</Text>
-    </View>:null}
+    </View>:<Text style={[styles.badgeText,{color:status.past?c.muted:c.event}]}>{status.label}</Text>}
   </Pressable>;
 }
 const styles=StyleSheet.create({

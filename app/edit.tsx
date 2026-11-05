@@ -193,16 +193,17 @@ export default function Edit(){
       </View></View>
     </Modal>
     {isEvent?<>
-      <Text style={s.helper}>Eventos avisam antes de começar, com a antecedência que você escolher.</Text>
-      <Text style={s.label}>04 / QUANDO TE AVISO?</Text>
-      <View style={[s.row,{flexWrap:'wrap'}]}>{eventAlertOptions.map(option=>{const active=alerts.includes(option.minutes);
+      <Text style={s.label}>04 / QUANDO TE AVISO? <Text style={s.labelOptional}>(ATÉ 3)</Text></Text>
+      {/* Poucas opções; um aviso salvo antes com outra antecedência continua aparecendo para poder ser tirado. */}
+      <View style={[s.row,{flexWrap:'wrap'}]}>{[...eventAlertOptions,...alerts.filter(m=>!eventAlertOptions.some(o=>o.minutes===m)).map(m=>({minutes:m,label:m>=1440&&m%1440===0?`${m/1440} dias`:m>=60&&m%60===0?`${m/60}h`:`${m} min`}))].sort((a,b)=>a.minutes-b.minutes).map(option=>{const active=alerts.includes(option.minutes);
         return <Pressable key={option.minutes} accessibilityRole="checkbox" accessibilityState={{checked:active}} onPress={()=>toggleAlert(option.minutes)} style={[s.alertChip,active&&{borderColor:c.event,backgroundColor:c.surfaceRaised}]}>
           <Text style={[s.choiceText,active&&{color:c.event,fontWeight:'900'}]}>{active?'🔔 ':''}{option.label}</Text>
         </Pressable>;})}</View>
-      <Text style={s.helper}>{alerts.length?`${alerts.length} de 3 avisos. Avisos com horário que já passou são ignorados.`:'Sem aviso: o evento só aparece na agenda.'}</Text>
+      {alerts.length?null:<Text style={s.helper}>Sem aviso: o evento só aparece na agenda.</Text>}
     </>:<Text style={s.helper}>{!hasDue?(daily?'Sem horário, sem notificação. A rotina aparece todo dia na sua lista.':'Sem data, sem notificação. A tarefa fica na sua lista até você concluir.'):daily?'Uma notificação por dia, no horário escolhido. Silêncio entre 22h e 7h.':'Lembretes contextuais no horário e, para tarefas comuns, após 15 min, 1h e 3h. Silêncio entre 22h e 7h. Saúde recebe um aviso único.'}</Text>}
-    <Text style={s.label}>{isEvent?'05':'04'} / QUAL O ASSUNTO?</Text>
-    <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=>{const active=category===key;return <Pressable key={key} accessibilityRole="radio" accessibilityLabel={categories[key]} accessibilityState={{selected:active}} style={[s.choice,s.topic,active&&s.selected]} onPress={()=>setCategory(key)}><Text style={s.topicEmoji}>{categoryEmoji[key]}</Text><Text style={[s.choiceText,active&&s.selectedText]}>{categories[key]}</Text></Pressable>;})}</View>
+    {/* Evento não pede assunto: fica com o que já tinha (novo = Geral). */}
+    {isEvent?null:<><Text style={s.label}>04 / QUAL O ASSUNTO?</Text>
+    <View style={[s.row,{flexWrap:'wrap'}]}>{(Object.keys(categories) as TaskCategory[]).map(key=>{const active=category===key;return <Pressable key={key} accessibilityRole="radio" accessibilityLabel={categories[key]} accessibilityState={{selected:active}} style={[s.choice,s.topic,active&&s.selected]} onPress={()=>setCategory(key)}><Text style={s.topicEmoji}>{categoryEmoji[key]}</Text><Text style={[s.choiceText,active&&s.selectedText]}>{categories[key]}</Text></Pressable>;})}</View></>}
     {isEvent?null:<><Text style={s.label}>05 / QUAL A URGÊNCIA?</Text>
     <View style={s.row}>{(['low','medium','high'] as const).map((p,i)=>{
       const color=priorityColors[p];
