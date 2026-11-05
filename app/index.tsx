@@ -11,6 +11,8 @@ import {SummaryNote} from '../src/components/SummaryNote';
 import {TaskTitle} from '../src/components/TaskTitle';
 import {sortTasks,sectionTasks} from '../src/task-order';
 import {EventCard} from '../src/components/EventCard';
+import {Confetti} from '../src/components/Confetti';
+import {takePendingHighlight,onHighlightRequest} from '../src/highlight';
 
 type Tab='home'|'tasks'|'calendar';
 const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -24,7 +26,7 @@ function ago(ms:number,now:number){
   const d=Math.floor(h/24);return `há ${d} ${d===1?'dia':'dias'}`;
 }
 /** O que o cartão precisa dizer sobre a data: na seção de um dia (ou no Hoje) a data já está implícita. */
-type CardContext={dayKnown?:boolean};
+type CardContext={dayKnown?:boolean;page?:'home'|'tasks'|'calendar'};
 const greetings=['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'];
 export default function Home(){
   const {colors:c,appearance}=useAppTheme();
@@ -54,9 +56,30 @@ export default function Home(){
   const [busyDelete,setBusyDelete]=useState(false);
   const [feedback,setFeedback]=useState<{title:string;message:string}|null>(null);
   const [showDone,setShowDone]=useState(false);
+  // Destaque de tarefa pedido pela notificação/widget: vai para a aba certa, rola até ela e pisca.
+  const [highlightRequest,setHighlightRequest]=useState<{id:number;loaded:boolean}|null>(null);
+  const [highlight,setHighlight]=useState<{id:number;page:Tab}|null>(null);
+  const highlightAnim=useRef(new Animated.Value(0)).current;
+  const highlightRef=useRef<React.ElementRef<typeof View>|null>(null);
+  const scrollRefs=useRef<Partial<Record<Tab,any>>>({});
+  const scrollY=useRef<Record<Tab,number>>({home:0,tasks:0,calendar:0});
+  const highlightTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const [confettiKey,setConfettiKey]=useState(0);
   const router=useRouter();
   const insets=useSafeAreaInsets();
   const refresh=useCallback(async()=>{await archiveOldCompletedTasks();const all=await listTasks();setTasks(all);setVisibleTaskCount(50);setNow(Date.now());},[]);
+  React.useEffect(()=>{
+    const pull=()=>{
+      const id=takePendingHighlight();
+      if(id===null)return;
+      setHighlightRequest({id,loaded:false});
+      // Recarrega antes de procurar: o toque pode ter vindo logo após uma mudança no widget.
+      refresh().catch(console.warn).finally(()=>setHighlightRequest(r=>r&&r.id===id?{...r,loaded:true}:r));
+    };
+    pull();
+    const off=onHighlightRequest(pull);
+    return()=>{off();if(highlightTimer.current)clearTimeout(highlightTimer.current);};
+  },[refresh]);
   useFocusEffect(useCallback(()=>{
     opening.current=false;
     refresh().catch(console.warn);
@@ -113,7 +136,12 @@ export default function Home(){
    */
   function card(t:Task,ctx:CardContext={}){
     if(t.parent_id)return subCard(t);
-    if(t.kind==='event')return <EventCard key={t.id} task={t} now={now} colors={c} appearance={appearance} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}/>;
+    const lit=!!highlight&&highlight.id===t.id&&highlight.page===ctx.page;
+    const glow=lit?<Animated.View pointerEvents="none" style={[s.highlight,{opacity:highlightAnim}]}/>:null;
+    if(t.kind==='event'){
+      const event=<EventCard key={t.id} task={t} now={now} colors={c} appearance={appearance} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}/>;
+      return lit?<View key={t.id} ref={highlightRef}>{glow}{event}</View>:event;
+    }
     const late=!t.completed&&!t.daily&&!t.no_due&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
     const when=t.daily?(t.no_due?'↻ diária':'↻ diária · '+hhmm(t.due_at))
@@ -121,7 +149,8 @@ export default function Home(){
       :late?`${isToday(t.due_at)?hhmm(t.due_at):shortDay(t.due_at)} · ${ago(t.due_at,now)}`
       :ctx.dayKnown?hhmm(t.due_at):formatDate(t.due_at);
     const showTopic=t.category!=='general'&&!!categories[t.category];
-    return <Pressable key={t.id} style={s.task} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+    return <Pressable key={t.id} ref={lit?highlightRef:undefined} style={s.task} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
+      {glow}
       <Pressable accessibilityRole="checkbox" accessibilityLabel={t.completed?'Marcar como pendente':'Concluir tarefa'} accessibilityState={{checked:!!t.completed}} hitSlop={8} onPress={()=>toggle(t)} style={[s.check,late?{borderColor:c.danger}:undefined,!!t.completed?s.checked:undefined]}>
         <Text style={s.checkText}>{t.completed?'✓':''}</Text>
       </Pressable>
@@ -170,9 +199,52 @@ export default function Home(){
   const doneBlock=doneOlder.length?[{key:'done',label:'CONCLUÍDAS',tasks:doneOlder}]:[];
   const sectionGroup=(section:{key:string;label:string;tasks:Task[]},first:boolean)=><React.Fragment key={section.key}>
     {sectionHead(section.label,section.tasks.length,section.key==='overdue'?c.danger:undefined,first)}
-    {groupedCards(section.tasks,filteredPage,{dayKnown:/^d\d/.test(section.key)})}
+    {groupedCards(section.tasks,filteredPage,{dayKnown:/^d\d/.test(section.key),page:'tasks'})}
   </React.Fragment>;
   const homeHasPending=overdue.length+agenda.length+upcoming.length>0;
+  // Confete de recompensa: ao chegar na aba Hoje com tudo feito, ou ao concluir a última estando nela.
+  const allDone=!homeHasPending&&completedToday.length>0;
+  const confettiState=useRef<{tab:Tab|null;allDone:boolean}>({tab:null,allDone:false});
+  React.useEffect(()=>{
+    const prev=confettiState.current;
+    if(tab==='home'&&allDone&&(prev.tab!=='home'||!prev.allDone))setConfettiKey(k=>k+1);
+    confettiState.current={tab,allDone};
+  },[tab,allDone]);
+  React.useEffect(()=>{
+    if(!highlightRequest)return;
+    const found=tasks.find(t=>t.id===highlightRequest.id);
+    if(!found){
+      // Tarefa apagada/arquivada: só leva para a aba Hoje.
+      if(highlightRequest.loaded){setHighlightRequest(null);goToTab('home');}
+      return;
+    }
+    const root=found.parent_id?tasks.find(t=>t.id===found.parent_id)??found:found;
+    const onHome=[...overdue,...agenda,...upcoming.slice(0,8)].some(t=>t.id===root.id);
+    const doneHome=completedToday.some(t=>t.id===root.id);
+    const page:Tab=onHome||doneHome?'home':'tasks';
+    if(doneHome)setShowDone(true);
+    if(page==='tasks')setTaskCategoryFilter('all');
+    setHighlightRequest(null);
+    setHighlight({id:root.id,page});
+    goToTab(page);
+    if(highlightTimer.current)clearTimeout(highlightTimer.current);
+    // Espera a troca de aba e o desenho do cartão para medir, rolar e piscar.
+    highlightTimer.current=setTimeout(()=>{
+      highlightRef.current?.measureInWindow((_x:number,y:number)=>{
+        const target=scrollY.current[page]+y-Dimensions.get('window').height*0.35;
+        scrollRefs.current[page]?.scrollTo({y:Math.max(0,target),animated:true});
+      });
+      highlightAnim.setValue(0);
+      Animated.sequence([
+        Animated.delay(250),
+        Animated.timing(highlightAnim,{toValue:1,duration:180,useNativeDriver:true}),
+        Animated.timing(highlightAnim,{toValue:0.35,duration:260,useNativeDriver:true}),
+        Animated.timing(highlightAnim,{toValue:1,duration:260,useNativeDriver:true}),
+        Animated.delay(600),
+        Animated.timing(highlightAnim,{toValue:0,duration:700,useNativeDriver:true}),
+      ]).start(()=>setHighlight(h=>h&&h.id===root.id?null:h));
+    },450);
+  },[highlightRequest,tasks]);
   return <View style={s.root}>
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
@@ -184,8 +256,8 @@ export default function Home(){
       onMomentumScrollEnd={event=>{const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));pageRef.current=index;setTab(tabs[index]);}}
     >
       {tabs.map((page,index)=><View key={page} style={{width:pageWidth,flex:1}}>
-      <Animated.ScrollView style={{flex:1}} contentContainerStyle={[s.container,{paddingTop:insets.top+89}]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
-        onScroll={Animated.event([{nativeEvent:{contentOffset:{y:verticalY[page]}}}],{useNativeDriver:true})}>
+      <Animated.ScrollView ref={(el:any)=>{scrollRefs.current[page]=el;}} style={{flex:1}} contentContainerStyle={[s.container,{paddingTop:insets.top+89}]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
+        onScroll={Animated.event([{nativeEvent:{contentOffset:{y:verticalY[page]}}}],{useNativeDriver:true,listener:(event:any)=>{scrollY.current[page]=event.nativeEvent.contentOffset.y;}})}>
 
       <>
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
@@ -193,16 +265,16 @@ export default function Home(){
       {page==='home'?<>
         <SummaryNote appearance={appearance} page={c.background} left={overdue.length+todayAhead.length} overdue={overdue.length} today={todayAhead.length} done={completedToday.length}/>
         {/* Ordem de urgência: atrasadas → agenda → radar. Seções vazias não aparecem. */}
-        {overdue.length?<>{sectionHead('PASSOU DA HORA',overdue.length,c.danger)}{groupedCards(overdue)}</>:null}
-        {agenda.length?<>{sectionHead('AGENDA DE HOJE',agenda.length)}{groupedCards(agenda,tasks,{dayKnown:true})}</>:null}
-        {upcoming.length?<>{sectionHead('NO RADAR',upcoming.length)}{groupedCards(upcoming.slice(0,8),tasks,{dayKnown:true})}</>:null}
+        {overdue.length?<>{sectionHead('PASSOU DA HORA',overdue.length,c.danger)}{groupedCards(overdue,tasks,{page:'home'})}</>:null}
+        {agenda.length?<>{sectionHead('AGENDA DE HOJE',agenda.length)}{groupedCards(agenda,tasks,{dayKnown:true,page:'home'})}</>:null}
+        {upcoming.length?<>{sectionHead('NO RADAR',upcoming.length)}{groupedCards(upcoming.slice(0,8),tasks,{dayKnown:true,page:'home'})}</>:null}
         {!homeHasPending?empty(completedToday.length?'Tudo feito por hoje. Que paz suspeita.':'Nada pra hoje. Toque no + para criar uma tarefa.'):null}
         {completedToday.length?<>
           <Pressable accessibilityRole="button" accessibilityState={{expanded:showDone}} onPress={()=>setShowDone(v=>!v)} style={s.doneToggle}>
             <Text style={s.doneToggleText}>✓  {completedToday.length} {completedToday.length===1?'concluída':'concluídas'} hoje</Text>
             <Text style={s.doneToggleText}>{showDone?'⌃':'⌄'}</Text>
           </Pressable>
-          {showDone?groupedCards(completedToday):null}
+          {showDone?groupedCards(completedToday,tasks,{page:'home'}):null}
         </>:null}
       </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks} selected={calendarDay} onSelect={setCalendarDay}/>:<>
         {/* Rotinas ganham uma linha própria e sempre visível, antes dos filtros. */}
@@ -254,6 +326,7 @@ export default function Home(){
       <Text style={[s.navText,tab===key&&s.navActive]}>{['HOJE','TAREFAS','CALENDÁRIO'][i]}</Text>
       {tab===key?<View style={s.dot}/>:null}
     </Pressable>)}</View>
+    <Confetti fireKey={confettiKey} colors={[c.accent,c.event,c.warning,c.danger,'#A9B8FF','#7DDCC7','#FFAD91']}/>
   </View>;
 }
 const createStyles=(c:ThemeColors)=>StyleSheet.create({
@@ -278,6 +351,7 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   taskDescription:{color:c.muted,fontSize:13,lineHeight:18},
   meta:{color:c.muted,fontSize:12},
   priorityLine:{width:26,height:5,borderRadius:3},
+  highlight:{position:'absolute',left:-10,right:-10,top:2,bottom:2,borderRadius:12,backgroundColor:c.accentSoft,borderWidth:1.5,borderColor:c.accent},
   empty:{color:c.muted,paddingVertical:23,fontSize:13,lineHeight:20},
   filters:{marginTop:4,marginHorizontal:-8},
   chip:{paddingHorizontal:12,paddingVertical:7,borderRadius:999},

@@ -9,6 +9,7 @@ import {setupNotifications,ensureNotificationPermission} from '../src/notificati
 import {handleNotificationResponse} from '../src/notification-actions';
 import {ThemeProvider,useAppTheme} from '../src/theme';
 import {DialogHost} from '../src/components/PingDialog';
+import {requestHighlight} from '../src/highlight';
 function AppStack(){
   const {colors:theme,appearance}=useAppTheme();
   const router=useRouter();
@@ -22,12 +23,15 @@ function AppStack(){
     if(!(await needsOnboarding()))await ensureNotificationPermission();
     await reconcileReminders();
   })().catch(console.warn);},[]);
-  // Toque na notificação abre a tarefa; botões com o app aberto também passam por aqui.
+  // Toque na notificação leva para a aba Hoje com a tarefa destacada (não abre a edição);
+  // botões com o app aberto também passam por aqui.
   const lastResponse=Notifications.useLastNotificationResponse();
   useEffect(()=>{
     if(!ready||needsSetup||!lastResponse)return;
     handleNotificationResponse(lastResponse).then(taskId=>{
-      if(taskId!==null)router.push({pathname:'/edit',params:{id:String(taskId)}});
+      if(taskId===null)return;
+      requestHighlight(taskId);
+      if(router.canDismiss())router.dismissAll();
     }).catch(console.warn).finally(()=>{Notifications.clearLastNotificationResponseAsync().catch(()=>{});});
   },[ready,needsSetup,lastResponse,router]);
   useEffect(()=>{let active=true;initDB().then(needsOnboarding).then(needed=>{if(active){setNeedsSetup(needed);setReady(true);}}).catch(e=>{console.warn(e);if(active)setReady(true);});return()=>{active=false;};},[]);

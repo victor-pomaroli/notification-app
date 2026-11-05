@@ -17,7 +17,7 @@ index 0f963f0..be9b71c 100644
 -            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
 +            fos = new FileOutputStream(tmp);
 +            written = bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
-+            fos.getFD().sync();
++            // No fsync: the rename below is atomic for readers, and fsync only adds latency to every tap.
          } catch (Exception e) {
              e.printStackTrace();
          } finally {

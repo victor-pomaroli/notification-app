@@ -31,6 +31,8 @@ export function ThemeProvider({children}:{children:React.ReactNode}){
   const changeAppearance=async(value:Appearance)=>{
     await setPreference('appearance',value);
     setAppearance(value);
+    // O widget segue o tema do app.
+    import('./widget/sync').then(m=>m.refreshPingWidget()).catch(()=>{});
   };
   const value=useMemo(()=>({colors:palettes[appearance],appearance,changeAppearance}),[appearance]);
   return React.createElement(ThemeContext.Provider,{value},children);
