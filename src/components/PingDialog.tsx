@@ -51,3 +51,28 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   destructive:{backgroundColor:c.danger},
   confirmText:{color:c.background,fontSize:12,fontWeight:'900',letterSpacing:1},
 });
+
+/**
+ * Diálogo global no estilo do app, no lugar do Alert nativo do Android.
+ * `showDialog` funciona de qualquer tela (inclusive logo após router.back());
+ * o DialogHost, montado uma vez no _layout, mostra os pedidos em fila.
+ */
+export type DialogRequest={eyebrow?:string;title:string;message?:string;confirmLabel?:string;cancelLabel?:string;destructive?:boolean;onConfirm?:()=>unknown};
+let pushDialog:((request:DialogRequest)=>void)|null=null;
+export function showDialog(request:DialogRequest){if(pushDialog)pushDialog(request);else console.warn(request.title,request.message);}
+/** Atalho para erro: título + detalhe técnico. */
+export const showError=(title:string,error:unknown)=>showDialog({eyebrow:'PING / OPS',title,message:String(error),confirmLabel:'FECHAR'});
+export function DialogHost(){
+  const [queue,setQueue]=React.useState<DialogRequest[]>([]);
+  const [busy,setBusy]=React.useState(false);
+  React.useEffect(()=>{pushDialog=request=>setQueue(old=>[...old,request]);return()=>{pushDialog=null;};},[]);
+  const current=queue[0];
+  const close=()=>setQueue(old=>old.slice(1));
+  async function confirm(){
+    if(!current?.onConfirm){close();return;}
+    setBusy(true);
+    try{await current.onConfirm();}catch(e){console.warn(e);}
+    finally{setBusy(false);close();}
+  }
+  return <PingDialog visible={!!current} eyebrow={current?.eyebrow} title={current?.title??''} message={current?.message} confirmLabel={current?.confirmLabel} cancelLabel={current?.cancelLabel} destructive={current?.destructive} busy={busy} onConfirm={confirm} onClose={()=>{if(!busy)close();}}/>;
+}

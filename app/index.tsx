@@ -4,7 +4,7 @@ import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {localDay,Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,deleteTask} from '../src/store';
 import {categories,TaskCategory} from '../src/templates';
-import {useAppTheme,ThemeColors,categoryColors} from '../src/theme';
+import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 import {CalendarScreen} from '../src/components/CalendarScreen';
 import {SummaryNote} from '../src/components/SummaryNote';
@@ -108,7 +108,7 @@ export default function Home(){
   function groupedCards(parents:Task[],pool:Task[]=tasks,ctx:CardContext={}){return parents.filter(t=>!t.parent_id).flatMap(parent=>[card(parent,ctx),...pool.filter(child=>child.parent_id===parent.id).map(child=>card(child,ctx))]);}
   /**
    * Cartão de tarefa enxuto: um só sinal por cartão. Atraso = caixa e horário em vermelho
-   * (a seção já diz "passou da hora"); prioridade só aparece quando é ALTA; o assunto
+   * (a seção já diz "passou da hora"); prioridade como o traço colorido do Calendário; o assunto
    * "Geral" (o padrão) não aparece; a data some quando a seção já é daquele dia.
    */
   function card(t:Task,ctx:CardContext={}){
@@ -133,7 +133,7 @@ export default function Home(){
           {when?<Text style={late?{color:c.danger,fontWeight:'700'}:undefined}>{when}</Text>:null}
         </Text>:null}
       </View>
-      {t.priority==='high'&&!t.completed?<Text style={s.priority}>ALTA</Text>:null}
+      <View accessibilityLabel={`Urgência ${({low:'baixa',medium:'média',high:'alta'} as const)[t.priority]}`} style={[s.priorityLine,{backgroundColor:priorityColors[t.priority]}]}/>
     </Pressable>;
   }
   /**
@@ -152,15 +152,22 @@ export default function Home(){
   }
   const empty=(message:string)=><Text style={s.empty}>{message}</Text>;
   /** Título de seção discreto: rótulo cinza + contagem, sem linha. Só "passou da hora" ganha cor. */
-  const sectionHead=(label:string,count:number,color?:string,first?:boolean)=><View style={[s.sectionHead,first?{marginTop:10}:undefined]}>
+  const sectionHead=(label:string,count:number,color?:string,first?:boolean)=><View style={[s.sectionHead,first?{marginTop:12}:undefined]}>
     <Text style={[s.section,color?{color}:undefined]}>{label}<Text style={s.sectionCount}>{'  ·  '+count}</Text></Text>
   </View>;
   const routineCount=tasks.filter(t=>t.daily&&!t.parent_id).length;
   const todayKey='d'+localDay(new Date(now));
   const taskSections=sectionTasks(filteredPage.filter(t=>!t.parent_id),now);
-  const todayBlock=taskSections.filter(x=>x.key==='daily'||x.key==='overdue'||x.key===todayKey).map(x=>x.key===todayKey?{...x,label:'AINDA HOJE'}:x);
+  // Concluídas hoje ficam dentro do bloco Hoje; concluídas de outros dias (se houver) vão para o fim.
+  const doneAll=taskSections.find(x=>x.key==='done')?.tasks??[];
+  const doneToday=doneAll.filter(t=>t.completed_at!=null&&isToday(t.completed_at));
+  const todayBlock=[
+    ...taskSections.filter(x=>x.key==='daily'||x.key==='overdue'||x.key===todayKey).map(x=>x.key===todayKey?{...x,label:'AINDA HOJE'}:x),
+    ...(doneToday.length?[{key:'doneToday',label:'CONCLUÍDAS HOJE',tasks:doneToday}]:[]),
+  ];
   const laterBlock=taskSections.filter(x=>x.key!=='done'&&!todayBlock.some(y=>y.key===x.key));
-  const doneBlock=taskSections.filter(x=>x.key==='done');
+  const doneOlder=doneAll.filter(t=>!doneToday.includes(t));
+  const doneBlock=doneOlder.length?[{key:'done',label:'CONCLUÍDAS',tasks:doneOlder}]:[];
   const sectionGroup=(section:{key:string;label:string;tasks:Task[]},first:boolean)=><React.Fragment key={section.key}>
     {sectionHead(section.label,section.tasks.length,section.key==='overdue'?c.danger:undefined,first)}
     {groupedCards(section.tasks,filteredPage,{dayKnown:/^d\d/.test(section.key)})}
@@ -200,9 +207,8 @@ export default function Home(){
       </>:page==='calendar'?<CalendarScreen active={tab==='calendar'} refreshKey={tasks} selected={calendarDay} onSelect={setCalendarDay}/>:<>
         {/* Rotinas ganham uma linha própria e sempre visível, antes dos filtros. */}
         <Pressable accessibilityRole="button" accessibilityLabel="Abrir minhas rotinas" onPress={()=>router.push('/routines')} style={s.routinesRow}>
-          <Text style={s.routinesIcon}>↻</Text>
-          <View style={{flex:1}}><Text style={s.routinesTitle}>Minhas rotinas</Text><Text style={s.routinesSub}>{routineCount?`${routineCount} ${routineCount===1?'rotina diária':'rotinas diárias'}`:'Crie hábitos que se repetem todo dia'}</Text></View>
-          <Text style={s.routinesArrow}>›</Text>
+          <Text style={s.routinesTitle}>↻  Minhas rotinas</Text>
+          <Text style={s.routinesSub}>{routineCount?`${routineCount} ${routineCount===1?'ativa':'ativas'}  ›`:'criar  ›'}</Text>
         </Pressable>
         <View style={s.filters}><ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row',alignItems:'center',gap:4,paddingVertical:2,paddingRight:4}}
           onTouchStart={()=>setFiltersTouched(true)} onTouchEnd={()=>setFiltersTouched(false)} onTouchCancel={()=>setFiltersTouched(false)} onScrollEndDrag={()=>setFiltersTouched(false)}>{([{key:'all',label:'Todas'},{key:'event',label:'Eventos'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|'event'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:item.key==='event'?{text:c.event,surface:c.surfaceRaised}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={[s.chip,active?{backgroundColor:topic.surface}:undefined]}><Text style={[s.chipText,active?{color:topic.text}:undefined]}>{item.label}{active&&item.key==='all'?'  '+filteredTasks.length:''}</Text></Pressable>;})}
@@ -210,11 +216,11 @@ export default function Home(){
         {filteredTasks.length?<>
           {/* Bloco "Hoje" (rotinas, atrasadas e o que vence hoje) separado do que vem depois. */}
           <View style={s.block}>
-            <Text style={s.blockTitle}>Hoje<Text style={s.blockCount}>{'  '+todayBlock.reduce((n,x)=>n+x.tasks.length,0)}</Text></Text>
+            <Text style={s.blockTitle}>Hoje<Text style={s.blockCount}>{'  '+todayBlock.filter(x=>x.key!=='doneToday').reduce((n,x)=>n+x.tasks.length,0)}</Text></Text>
             {todayBlock.length?todayBlock.map((section,i)=>sectionGroup(section,i===0)):<Text style={[s.empty,{paddingVertical:10}]}>Nada pra hoje neste filtro.</Text>}
           </View>
           {laterBlock.length?<>
-            <Text style={[s.blockTitle,{marginTop:30,paddingHorizontal:0}]}>Próximos<Text style={s.blockCount}>{'  '+laterBlock.reduce((n,x)=>n+x.tasks.length,0)}</Text></Text>
+            <Text style={[s.blockTitle,{marginTop:34}]}>Próximos<Text style={s.blockCount}>{'  '+laterBlock.reduce((n,x)=>n+x.tasks.length,0)}</Text></Text>
             {laterBlock.map((section,i)=>sectionGroup(section,i===0))}
           </>:null}
           {doneBlock.map(section=>sectionGroup(section,false))}
@@ -271,18 +277,16 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   taskTitle:{color:c.text,fontSize:17,fontWeight:'700',letterSpacing:-0.3},
   taskDescription:{color:c.muted,fontSize:13,lineHeight:18},
   meta:{color:c.muted,fontSize:12},
-  priority:{color:c.warning,fontSize:10,fontWeight:'900',letterSpacing:0.6},
+  priorityLine:{width:26,height:5,borderRadius:3},
   empty:{color:c.muted,paddingVertical:23,fontSize:13,lineHeight:20},
   filters:{marginTop:4,marginHorizontal:-8},
   chip:{paddingHorizontal:12,paddingVertical:7,borderRadius:999},
   chipText:{color:c.muted,fontSize:13,fontWeight:'700'},
-  routinesRow:{flexDirection:'row',alignItems:'center',gap:12,marginTop:4,marginBottom:12,paddingVertical:12,paddingHorizontal:14,borderRadius:12,borderWidth:1,borderColor:c.accent,backgroundColor:c.accentSoft},
-  routinesIcon:{color:c.accent,fontSize:22,fontWeight:'900'},
-  routinesTitle:{color:c.text,fontSize:15,fontWeight:'800'},
-  routinesSub:{color:c.muted,fontSize:12,marginTop:2},
-  routinesArrow:{color:c.accent,fontSize:24,fontWeight:'700'},
-  block:{marginTop:16,marginHorizontal:-10,paddingHorizontal:10,paddingTop:14,paddingBottom:6,borderRadius:14,backgroundColor:c.surface},
-  blockTitle:{color:c.text,fontSize:22,fontWeight:'900',letterSpacing:-0.6},
+  routinesRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:10,paddingVertical:9,paddingHorizontal:12,borderRadius:10,backgroundColor:c.accentSoft},
+  routinesTitle:{color:c.accent,fontSize:13,fontWeight:'800'},
+  routinesSub:{color:c.accent,fontSize:12,fontWeight:'700'},
+  block:{marginTop:18,marginHorizontal:-8,paddingHorizontal:16,paddingTop:18,paddingBottom:12,borderRadius:16,backgroundColor:c.surface},
+  blockTitle:{color:c.text,fontSize:22,fontWeight:'900',letterSpacing:-0.6,marginBottom:2},
   blockCount:{color:c.muted,fontSize:15,fontWeight:'700'},
   doneToggle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:26,paddingVertical:12,paddingHorizontal:14,borderRadius:10,backgroundColor:c.surface},
   doneToggleText:{color:c.muted,fontSize:13,fontWeight:'700'},

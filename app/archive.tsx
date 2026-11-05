@@ -1,5 +1,6 @@
 import React,{useCallback,useState} from 'react';
-import {View,Text,FlatList,Pressable,Alert} from 'react-native';
+import {View,Text,FlatList,Pressable} from 'react-native';
+import {showError} from '../src/components/PingDialog';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {Task,listArchivedTasks,restoreArchivedTask} from '../src/store';
 import {useAppTheme} from '../src/theme';
@@ -19,13 +20,13 @@ export default function Archive(){
      const rows=await listArchivedTasks(PAGE,reset?0:tasks.length);
      setTasks(old=>reset?rows:[...old,...rows.filter(t=>!old.some(x=>x.id===t.id))]);
      setHasMore(rows.length===PAGE);
-   }catch(e){Alert.alert('Erro ao carregar histórico',String(e));}
+   }catch(e){showError('Erro ao carregar histórico',e);}
    finally{setLoading(false);}
  },[loading,tasks.length]);
- useFocusEffect(useCallback(()=>{listArchivedTasks(PAGE,0).then(rows=>{setTasks(rows);setHasMore(rows.length===PAGE);}).catch(e=>Alert.alert('Erro',String(e)));},[]));
+ useFocusEffect(useCallback(()=>{listArchivedTasks(PAGE,0).then(rows=>{setTasks(rows);setHasMore(rows.length===PAGE);}).catch(e=>showError('Erro ao carregar histórico',e));},[]));
  async function restore(task:Task){
    try{await restoreArchivedTask(task.id);setTasks(old=>old.filter(t=>t.id!==task.id));}
-   catch(e){Alert.alert('Não foi possível restaurar',String(e));}
+   catch(e){showError('Não foi possível restaurar',e);}
  }
  return <View style={{flex:1,backgroundColor:c.background,paddingHorizontal:22,paddingTop:18}}>
    <Text style={{fontSize:31,fontWeight:'900',color:c.text,marginBottom:6}}>Histórico.</Text>

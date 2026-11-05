@@ -1,12 +1,12 @@
 import React,{useEffect,useState} from 'react';
-import {Text,TextInput,Pressable,ScrollView,StyleSheet,View,Modal,Alert} from 'react-native';
+import {Text,TextInput,Pressable,ScrollView,StyleSheet,View,Modal} from 'react-native';
 import {useLocalSearchParams,useRouter} from 'expo-router';
 import {getTask,saveTaskGroup,listChildren,ChildInput,eventOffsets} from '../src/store';
 import * as Notifications from 'expo-notifications';
 import {getPreferences,setPreference} from '../src/preferences';
 import {categories,categoryEmoji,TaskCategory,eventAlertOptions} from '../src/templates';
 import {useAppTheme,ThemeColors,priorityColors} from '../src/theme';
-import {PingDialog} from '../src/components/PingDialog';
+import {PingDialog,showDialog} from '../src/components/PingDialog';
 export default function Edit(){
   const {colors:c}=useAppTheme();
   const s=React.useMemo(()=>createStyles(c),[c]);
@@ -90,8 +90,8 @@ export default function Edit(){
       const permission=prefs?.notifications&&wantsAlerts?await Notifications.getPermissionsAsync().catch(()=>null):null;
       const saved=isEvent?'Evento salvo':'Tarefa salva';
       router.back();
-      if(result.reminderError)Alert.alert(saved,'Não foi possível agendar o lembrete. Confira as notificações em Ajustes.');
-      else if(prefs?.notifications&&wantsAlerts&&!permission?.granted)Alert.alert(saved,'As notificações não estão permitidas no Android. Ative a permissão em Ajustes para receber lembretes.');
+      if(result.reminderError)showDialog({eyebrow:'PING / RECADO',title:saved,message:'Não foi possível agendar o lembrete. Confira as notificações em Ajustes.'});
+      else if(prefs?.notifications&&wantsAlerts&&!permission?.granted)showDialog({eyebrow:'PING / RECADO',title:saved,message:'As notificações não estão permitidas no Android. Ative a permissão em Ajustes para receber lembretes.'});
     }catch(e){setFeedback({title:'Não deu para salvar.',message:String(e)});}
     finally{setSaving(false);}
   }
