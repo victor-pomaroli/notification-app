@@ -6,6 +6,8 @@ export const theme={
   border:'#353C30',text:'#F4F1E7',muted:'#A4AA9A',
   accent:'#D7FC65',accentSoft:'#354326',danger:'#FF887B',
   success:'#D7FC65',warning:'#F7C66F',
+  /** Cor dos eventos (bolinha no calendário), distinta do realce das tarefas. */
+  event:'#7FB8FF',
 };
 export type ThemeColors={ [K in keyof typeof theme]: string };
 export type Appearance='dark'|'softLight';
@@ -16,6 +18,7 @@ export const palettes:Record<Appearance,ThemeColors>={
     border:'#CACDBE',text:'#242A22',muted:'#656D60',
     accent:'#536D23',accentSoft:'#DFE8C7',danger:'#B54D45',
     success:'#536D23',warning:'#A46E1D',
+    event:'#2F6DB5',
   },
 };
 type ThemeContextValue={colors:ThemeColors;appearance:Appearance;changeAppearance:(value:Appearance)=>Promise<void>};

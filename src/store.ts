@@ -3,7 +3,9 @@ import {getPreferences} from './preferences';
 import {reminderOffsets} from './templates';
 import {TaskCategory} from './templates';
 import {SNOOZE_STAGE,cancelTaskReminders,scheduleTaskReminders,scheduleSnoozeReminder,dismissTaskNotifications,dismissAllTaskNotifications,ScheduledReminder} from './notifications';
-export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;completed_at:number|null;archived_at:number|null;notification_id:string|null;parent_id:number|null;daily:number;daily_active:number;daily_day:string|null;no_due:number};
+export type Task={id:number;title:string;description:string;due_at:number;priority:'low'|'medium'|'high';category:TaskCategory;completed:number;completed_at:number|null;archived_at:number|null;notification_id:string|null;parent_id:number|null;daily:number;daily_active:number;daily_day:string|null;no_due:number;kind:TaskKind};
+/** `kind`: 'task' (tarefa) ou 'event' (evento com hora marcada, avisado antes de acontecer). */
+export type TaskKind='task'|'event';
 /** `no_due`: 1 = tarefa sem data ("quando?" opcional), não agenda lembretes. */
 export type TaskInput=Pick<Task,'title'|'description'|'due_at'|'priority'|'category'>&{no_due?:number};
 export type ChildInput={id?:number;title:string};
@@ -30,6 +32,7 @@ const ready=(async()=>{
   if(!cols.some(c=>c.name==='daily'))await db.execAsync('ALTER TABLE tasks ADD COLUMN daily INTEGER NOT NULL DEFAULT 0');
   if(!cols.some(c=>c.name==='daily_active'))await db.execAsync('ALTER TABLE tasks ADD COLUMN daily_active INTEGER NOT NULL DEFAULT 1');
   if(!cols.some(c=>c.name==='daily_day'))await db.execAsync('ALTER TABLE tasks ADD COLUMN daily_day TEXT');
+  if(!cols.some(c=>c.name==='kind'))await db.execAsync("ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'");
   if(!cols.some(c=>c.name==='no_due'))await db.execAsync('ALTER TABLE tasks ADD COLUMN no_due INTEGER NOT NULL DEFAULT 0');
   await db.execAsync('CREATE TABLE IF NOT EXISTS daily_history(task_id INTEGER NOT NULL,day TEXT NOT NULL,completed INTEGER NOT NULL,PRIMARY KEY(task_id,day))');
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id)');
@@ -61,17 +64,22 @@ export async function listTaskPage(limit=50,offset=0,category?:TaskCategory){
   return roots.flatMap(root=>[root,...(byParent.get(root.id)??[])]);
 }
 // Calendar queries: indexed timestamp ranges, root tasks only, no N+1 lookups.
-export type CalendarDaySummary={day:string;total:number;completed:number};
+/** `total`/`completed` contam tarefas; `events` conta eventos (bolinha de outra cor). */
+export type CalendarDaySummary={day:string;total:number;completed:number;events:number};
 export type CalendarEntry={task:Task;occurrenceDay:string;completed:boolean;routine:boolean};
 function calendarKey(timestamp:number){return localDay(new Date(timestamp));}
-/** Resumo do mês para as bolinhas: só tarefas com data. Rotinas diárias ficam de fora para as datas se destacarem. */
+/** Resumo do mês para as bolinhas: tarefas com data e eventos. Rotinas diárias ficam de fora para as datas se destacarem. */
 export async function listCalendarMonth(start:number,end:number):Promise<CalendarDaySummary[]>{
   const db=await ready;
-  const ordinary=await db.getAllAsync<{due_at:number;completed:number}>(
-    'SELECT due_at,completed FROM tasks WHERE parent_id IS NULL AND daily=0 AND no_due=0 AND archived_at IS NULL AND due_at>=? AND due_at<?',
+  const ordinary=await db.getAllAsync<{due_at:number;completed:number;kind:TaskKind}>(
+    'SELECT due_at,completed,kind FROM tasks WHERE parent_id IS NULL AND daily=0 AND no_due=0 AND archived_at IS NULL AND due_at>=? AND due_at<?',
     start,end);
   const summaries=new Map<string,CalendarDaySummary>();
-  for(const task of ordinary){const day=calendarKey(task.due_at);const row=summaries.get(day)??{day,total:0,completed:0};row.total++;if(task.completed)row.completed++;summaries.set(day,row);}
+  for(const task of ordinary){
+    const day=calendarKey(task.due_at);const row=summaries.get(day)??{day,total:0,completed:0,events:0};
+    if(task.kind==='event')row.events++;else{row.total++;if(task.completed)row.completed++;}
+    summaries.set(day,row);
+  }
   return [...summaries.values()];
 }
 export async function listCalendarDay(start:number,end:number):Promise<CalendarEntry[]>{
