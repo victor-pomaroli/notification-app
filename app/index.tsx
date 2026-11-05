@@ -10,6 +10,7 @@ import {CalendarScreen} from '../src/components/CalendarScreen';
 import {SummaryNote} from '../src/components/SummaryNote';
 import {TaskTitle} from '../src/components/TaskTitle';
 import {sortTasks,sectionTasks} from '../src/task-order';
+import {EventCard} from '../src/components/EventCard';
 
 type Tab='home'|'tasks'|'calendar';
 const priorityLabel={low:'BAIXA',medium:'MÉDIA',high:'ALTA'};
@@ -21,7 +22,8 @@ export default function Home(){
   const [tasks,setTasks]=useState<Task[]>([]);
   const [loadingPage,setLoadingPage]=useState(false);
   const [tab,setTab]=useState<Tab>('home');
-  const [taskCategoryFilter,setTaskCategoryFilter]=useState<'all'|TaskCategory>('all');
+  // 'event' = só eventos; as outras chaves filtram por assunto.
+  const [taskCategoryFilter,setTaskCategoryFilter]=useState<'all'|'event'|TaskCategory>('all');
   const [visibleTaskCount,setVisibleTaskCount]=useState(50);
   const pager=useRef<React.ElementRef<typeof Animated.ScrollView>>(null);
   const horizontalX=useRef(new Animated.Value(0)).current;
@@ -56,13 +58,17 @@ export default function Home(){
     if(opening.current)return;
     opening.current=true;
     if(tabs[pageRef.current]==='calendar')router.push({pathname:'/edit',params:{date:localDay(calendarDay)}});
+    // Com o filtro "Eventos" ativo em Tarefas, o + já abre o editor em modo evento.
+    else if(tabs[pageRef.current]==='tasks'&&taskCategoryFilter==='event')router.push({pathname:'/edit',params:{kind:'event'}});
     else router.push('/edit');
   }
-  const filteredTasks=tasks.filter(t=>!t.parent_id&&(taskCategoryFilter==='all'||t.category===taskCategoryFilter));
+  const filteredTasks=tasks.filter(t=>!t.parent_id&&(taskCategoryFilter==='all'||(taskCategoryFilter==='event'?t.kind==='event':t.category===taskCategoryFilter)));
+  const pageArgs=():[TaskCategory|undefined,'event'|undefined]=>taskCategoryFilter==='all'?[undefined,undefined]:taskCategoryFilter==='event'?[undefined,'event']:[taskCategoryFilter,undefined];
   const [filteredPage,setFilteredPage]=useState<Task[]>([]);
-  React.useEffect(()=>{let active=true;listTaskPage(50,0,taskCategoryFilter==='all'?undefined:taskCategoryFilter).then(rows=>{if(active){setFilteredPage(rows);setVisibleTaskCount(50);}}).catch(console.warn);return()=>{active=false;};},[taskCategoryFilter,tasks]);
-  async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.filter(t=>!t.parent_id).length,taskCategoryFilter==='all'?undefined:taskCategoryFilter);setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.filter(t=>!t.parent_id).length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
-  const roots=tasks.filter(t=>!t.parent_id);
+  React.useEffect(()=>{let active=true;listTaskPage(50,0,...pageArgs()).then(rows=>{if(active){setFilteredPage(rows);setVisibleTaskCount(50);}}).catch(console.warn);return()=>{active=false;};},[taskCategoryFilter,tasks]);
+  async function loadMoreTasks(){if(loadingPage)return;setLoadingPage(true);try{const rows=await listTaskPage(50,filteredPage.filter(t=>!t.parent_id).length,...pageArgs());setFilteredPage(old=>[...old,...rows]);setVisibleTaskCount(n=>n+rows.filter(t=>!t.parent_id).length);}catch(e){setFeedback({title:'Erro ao carregar tarefas',message:String(e)});}finally{setLoadingPage(false);}}
+  // Eventos não entram nas contas de pendentes/atrasadas: ficam na AGENDA.
+  const roots=tasks.filter(t=>!t.parent_id&&t.kind!=='event');
   const pending=roots.filter(t=>!t.completed);
   // Tarefas sem data nunca ficam atrasadas nem contam como "pra hoje"; aparecem no radar.
   const overdue=pending.filter(t=>!t.daily&&!t.no_due&&t.due_at<now).sort((a,b)=>a.due_at-b.due_at||a.id-b.id);
@@ -70,6 +76,7 @@ export default function Home(){
   // Tarefas de outros dias ficam em Tarefas e no Calendário.
   const isToday=(ms:number)=>new Date(ms).toDateString()===new Date(now).toDateString();
   const upcoming=sortTasks(pending.filter(t=>t.daily||t.no_due||(t.due_at>=now&&isToday(t.due_at))));
+  const agenda=tasks.filter(t=>!t.parent_id&&t.kind==='event'&&isToday(t.due_at)).sort((a,b)=>a.due_at-b.due_at||a.id-b.id);
   const today=pending.filter(t=>t.daily||(!t.no_due&&new Date(t.due_at).toDateString()===new Date(now).toDateString()));
   const todayAhead=today.filter(t=>!overdue.includes(t));
   const completedToday=roots.filter(t=>!!t.completed&&t.completed_at!=null&&new Date(t.completed_at).toDateString()===new Date(now).toDateString())
@@ -90,6 +97,7 @@ export default function Home(){
   function groupedCards(parents:Task[],pool:Task[]=tasks){return parents.filter(t=>!t.parent_id).flatMap(parent=>[card(parent),...pool.filter(child=>child.parent_id===parent.id).map(child=>card(child))]);}
   function card(t:Task){
     if(t.parent_id)return subCard(t);
+    if(t.kind==='event')return <EventCard key={t.id} task={t} now={now} colors={c} appearance={appearance} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}/>;
     const late=!t.completed&&!t.daily&&!t.no_due&&t.due_at<now;
     const topic=categoryColors[appearance][t.category]??categoryColors[appearance].general;
     return <Pressable key={t.id} style={[s.task,t.parent_id?{marginLeft:28,paddingLeft:12,borderLeftWidth:2,borderLeftColor:c.accentSoft,backgroundColor:c.surface}:undefined,late?{borderBottomColor:appearance==='dark'?'#A85850':'#CB8A7E'}:undefined]} onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} onLongPress={()=>remove(t)}>
@@ -143,6 +151,10 @@ export default function Home(){
       {page==='home'?<Text style={s.heading}>{'Seu dia.\nSem desculpas.'}</Text>:page==='calendar'?<Text style={s.heading}>{'Seu tempo.\nSeu ritmo.'}</Text>:null}
       {page==='home'?<>
         <SummaryNote appearance={appearance} page={c.background} left={overdue.length+todayAhead.length} overdue={overdue.length} today={todayAhead.length} done={completedToday.length}/>
+        {agenda.length?<>
+          <View style={s.sectionHead}><Text style={[s.section,{color:c.event}]}>AGENDA DE HOJE</Text><Text style={[s.sectionCount,{color:c.event}]}>{String(agenda.length).padStart(2,'0')}</Text></View>
+          {groupedCards(agenda)}
+        </>:null}
         <View style={s.sectionHead}><Text style={s.section}>PASSOU DA HORA</Text><Text style={s.sectionCount}>{String(overdue.length).padStart(2,'0')}</Text></View>
         {overdue.length?groupedCards(overdue):empty('Nada atrasado. Pode comemorar sem exagerar.')}
         <View style={s.sectionHead}><Text style={s.section}>NO RADAR</Text><Text style={s.sectionCount}>{String(upcoming.length).padStart(2,'0')}</Text></View>
@@ -158,11 +170,11 @@ export default function Home(){
           </Pressable>
         </View>
         <View style={s.filters}><ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row',gap:7,paddingVertical:2,paddingRight:4}}
-          onTouchStart={()=>setFiltersTouched(true)} onTouchEnd={()=>setFiltersTouched(false)} onTouchCancel={()=>setFiltersTouched(false)} onScrollEndDrag={()=>setFiltersTouched(false)}>{([{key:'all',label:'Todas'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={{paddingHorizontal:13,paddingVertical:8,borderRadius:999,borderWidth:1,borderColor:active?topic.text:c.border,backgroundColor:active?topic.surface:c.surface}}><Text style={{color:active?topic.text:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</ScrollView></View>
+          onTouchStart={()=>setFiltersTouched(true)} onTouchEnd={()=>setFiltersTouched(false)} onTouchCancel={()=>setFiltersTouched(false)} onScrollEndDrag={()=>setFiltersTouched(false)}>{([{key:'all',label:'Todas'},{key:'event',label:'Eventos'},...Object.entries(categories).map(([key,label])=>({key,label}))] as {key:'all'|'event'|TaskCategory;label:string}[]).map(item=>{const active=taskCategoryFilter===item.key;const topic=item.key==='all'?{text:c.accent,surface:c.accentSoft}:item.key==='event'?{text:c.event,surface:c.surfaceRaised}:categoryColors[appearance][item.key];return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{selected:active}} onPress={()=>{setTaskCategoryFilter(item.key);setVisibleTaskCount(50);}} style={{paddingHorizontal:13,paddingVertical:8,borderRadius:999,borderWidth:1,borderColor:active?topic.text:c.border,backgroundColor:active?topic.surface:c.surface}}><Text style={{color:active?topic.text:c.text,fontSize:12,fontWeight:'800'}}>{item.label}</Text></Pressable>;})}</ScrollView></View>
         {filteredTasks.length?sectionTasks(filteredPage.filter(t=>!t.parent_id),now).map(section=><React.Fragment key={section.key}>
           <View style={s.sectionHead}><Text style={[s.section,section.key==='overdue'?{color:appearance==='dark'?'#FF887B':'#B83931'}:undefined]}>{section.label}</Text><Text style={s.sectionCount}>{String(section.tasks.length).padStart(2,'0')}</Text></View>
           {groupedCards(section.tasks,filteredPage)}
-        </React.Fragment>):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':'Nenhuma tarefa neste tópico.')}
+        </React.Fragment>):empty(taskCategoryFilter==='all'?'Ainda não tem nada aqui. Crie sua primeira tarefa.':taskCategoryFilter==='event'?'Nenhum evento marcado. Toque no + e escolha Evento.':'Nenhuma tarefa neste tópico.')}
       </>}
       {page==='tasks'&&filteredTasks.length>visibleTaskCount?<Pressable accessibilityRole="button" onPress={loadMoreTasks} style={{backgroundColor:c.surface,borderRadius:9,padding:16,alignItems:'center',marginTop:20}}><Text style={{color:c.accent,fontWeight:'800'}}>{loadingPage?'CARREGANDO...':`CARREGAR MAIS (${filteredTasks.length-visibleTaskCount} RESTANTES)`}</Text></Pressable>:null}
       {page!=='calendar'?<Text style={s.tip}>TOQUE PARA EDITAR  ·  SEGURE PARA EXCLUIR</Text>:null}

@@ -5,6 +5,7 @@ import {CalendarDaySummary,CalendarEntry,listCalendarDay,listCalendarMonth,compl
 import {useAppTheme,ThemeColors,priorityColors} from '../theme';
 import {categories} from '../templates';
 import {TaskTitle} from './TaskTitle';
+import {EventCard} from './EventCard';
 
 const key=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
 const bounds=(d:Date)=>{const start=new Date(d.getFullYear(),d.getMonth(),d.getDate());const end=new Date(start);end.setDate(end.getDate()+1);return [start.getTime(),end.getTime()] as const;};
@@ -17,7 +18,7 @@ const WEEK=['D','S','T','Q','Q','S','S'];
  * O dia escolhido mora na tela principal, para o botão + criar a tarefa nesse dia.
  */
 export function CalendarScreen({active,refreshKey,selected,onSelect}:{active:boolean;refreshKey?:unknown;selected:Date;onSelect:(day:Date)=>void}){
-  const {colors:c}=useAppTheme();
+  const {colors:c,appearance}=useAppTheme();
   const s=useMemo(()=>createStyles(c),[c]);
   const router=useRouter();
   const [revision,setRevision]=useState(0);
@@ -70,7 +71,9 @@ export function CalendarScreen({active,refreshKey,selected,onSelect}:{active:boo
   const cells=Array.from({length:Math.ceil((first+count)/7)*7},(_,i)=>i-first+1);
   const summary=new Map(summaries.map(x=>[x.day,x]));
   const monthLabel=monthStart.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-  const pendingCount=entries.filter(e=>!e.completed).length;
+  const taskEntries=entries.filter(e=>!e.event),eventCount=entries.length-taskEntries.length;
+  const pendingCount=taskEntries.filter(e=>!e.completed).length;
+  const dayMeta=[eventCount?`${eventCount} evento${eventCount===1?'':'s'}`:'',taskEntries.length?`${taskEntries.length} tarefa${taskEntries.length===1?'':'s'} · ${pendingCount} pendente${pendingCount===1?'':'s'}`:''].filter(Boolean).join(' · ');
 
   async function toggle(entry:CalendarEntry){
     // Rotina só pode ser marcada no próprio dia; o histórico dos outros dias é só leitura.
@@ -114,7 +117,7 @@ export function CalendarScreen({active,refreshKey,selected,onSelect}:{active:boo
     <View style={s.dayHead}>
       <View style={{flex:1}}>
         <Text style={s.dayTitle}>{dayId===todayId?'Hoje, ':''}{selected.toLocaleDateString('pt-BR',{weekday:dayId===todayId?undefined:'long',day:'numeric',month:'long'})}</Text>
-        <Text style={s.dayMeta}>{entries.length===0?'Nada marcado':`${entries.length} tarefa${entries.length===1?'':'s'} · ${pendingCount} pendente${pendingCount===1?'':'s'}`}</Text>
+        <Text style={s.dayMeta}>{entries.length===0?'Nada marcado':dayMeta}</Text>
       </View>
       {dayId!==todayId?<Pressable accessibilityRole="button" hitSlop={8} onPress={()=>onSelect(new Date())} style={s.todayChip}><Text style={s.todayChipText}>HOJE</Text></Pressable>:null}
     </View>
@@ -123,6 +126,7 @@ export function CalendarScreen({active,refreshKey,selected,onSelect}:{active:boo
     {loading&&!entries.length?<ActivityIndicator color={c.accent} style={{marginTop:18}}/>
     :entries.length===0?<Text style={s.empty}>Dia livre. Toque no + para colocar algo neste dia.</Text>
     :entries.map(entry=>{
+      if(entry.event)return <EventCard key={entry.task.id} task={entry.task} now={Date.now()} colors={c} appearance={appearance} onPress={()=>router.push({pathname:'/edit',params:{id:String(entry.task.id)}})}/>;
       const locked=entry.routine&&dayId!==todayId;
       const t=entry.task;
       const time=t.no_due?'Sem horário':new Date(t.due_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});

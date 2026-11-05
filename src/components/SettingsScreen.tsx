@@ -9,7 +9,7 @@ import {useAppTheme,ThemeColors,Appearance,palettes} from '../theme';
 export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
  const {colors:c,appearance,changeAppearance}=useAppTheme();
  const s=React.useMemo(()=>createStyles(c),[c]);
- const [prefs,setPrefs]=useState<Preferences>({notifications:true,privatePreviews:false,appearance:'dark',displayName:'',addressStyle:'neutral',personality:'debochado'});
+ const [prefs,setPrefs]=useState<Preferences>({notifications:true,privatePreviews:false,appearance:'dark',displayName:'',addressStyle:'neutral',personality:'debochado',eventAlerts:[30]});
  const [busy,setBusy]=useState(false);
  const [permission,setPermission]=useState('Verificando...');
  const [themeBusy,setThemeBusy]=useState(false);

@@ -2,16 +2,16 @@ import {Task,localDay} from './store';
 /**
  * Ordem única para Hoje e Tarefas: rotinas diárias primeiro (pelo horário), depois as tarefas
  * com data pelo vencimento mais próximo (prioridade não interfere) e, por fim, as sem data,
- * ordenadas por prioridade (alta → baixa).
+ * ordenadas por prioridade (alta → baixa). Eventos vêm logo depois das diárias, pelo horário.
  */
 const priorityRank={high:0,medium:1,low:2};
 const minutesOfDay=(ms:number)=>{const d=new Date(ms);return d.getHours()*60+d.getMinutes();};
-function group(t:Task){return t.daily?0:t.no_due?2:1;}
+function group(t:Task){return t.daily?0:t.kind==='event'?1:t.no_due?3:2;}
 export function compareTasks(a:Task,b:Task){
   const ga=group(a),gb=group(b);
   if(ga!==gb)return ga-gb;
   if(ga===0){const ma=a.no_due?-1:minutesOfDay(a.due_at),mb=b.no_due?-1:minutesOfDay(b.due_at);if(ma!==mb)return ma-mb;}
-  else if(ga===1){if(a.due_at!==b.due_at)return a.due_at-b.due_at;}
+  else if(ga===1||ga===2){if(a.due_at!==b.due_at)return a.due_at-b.due_at;}
   else{const pa=priorityRank[a.priority]??1,pb=priorityRank[b.priority]??1;if(pa!==pb)return pa-pb;}
   return a.id-b.id;
 }
@@ -32,6 +32,8 @@ export function sectionTasks(roots:Task[],now=Date.now()):TaskSection[]{
   const push=(key:string,label:string,task:Task)=>{const s=sections.get(key)??{key,label,tasks:[]};s.tasks.push(task);sections.set(key,s);};
   const done:Task[]=[];
   for(const task of sortTasks(roots)){
+    // Evento fica no dia dele (mesmo já encerrado hoje); nunca vai para atrasadas nem concluídas.
+    if(task.kind==='event'){const day=localDay(new Date(task.due_at));push('d'+day,dayLabel(day,today,tomorrow),task);continue;}
     if(task.completed){done.push(task);continue;}
     if(task.daily)push('daily','ROTINAS DIÁRIAS',task);
     else if(task.no_due)push('nodate','SEM DATA',task);
