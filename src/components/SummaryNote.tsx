@@ -11,6 +11,12 @@ type Props={appearance:Appearance;page:string;left:number;overdue:number;today:n
 
 const pad=(n:number)=>String(n).padStart(2,'0');
 const plural=(n:number,one:string,many:string)=>`${n} ${n===1?one:many}`;
+/** Rótulo que muda com o estado do dia, em vez de um título fixo. */
+function moodLabel(left:number,overdue:number,done:number){
+  if(overdue>0)return 'TÁ DEVENDO';
+  if(left>0)return done>0&&left<=2?'FALTA POUCO':'AINDA HOJE';
+  return done>0?'MISSÃO CUMPRIDA':'DIA EM BRANCO';
+}
 
 export function SummaryNote({appearance,page,left,overdue,today,done}:Props){
   const look=appearance==='dark'?dark:light;
@@ -21,7 +27,7 @@ export function SummaryNote({appearance,page,left,overdue,today,done}:Props){
       {appearance==='dark'
         ?<View style={dark.binding}><View style={dark.holes}>{[0,1,2,3,4].map(i=><View key={i} style={[dark.hole,{backgroundColor:page}]}><View style={[dark.ring,{backgroundColor:page}]}/></View>)}</View></View>
         :<LiftedPaper/>}
-      <Text style={[base.label,{color:look.ink}]}>O RESUMO DA ÓPERA</Text>
+      <Text style={[base.label,{color:look.ink}]}>{moodLabel(left,overdue,done)}</Text>
       <View style={base.numbers}>
         <Text style={[base.big,{color:look.ink}]}>{pad(left)}</Text>
         <View style={base.side}>
