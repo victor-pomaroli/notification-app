@@ -19,6 +19,10 @@ A cada versão:
 
 ## [Não lançado]
 
+_Nada ainda._
+
+## [1.2.0] — 2026-11-05
+
 ### Adicionado
 - O post-it da aba Hoje dá um pulinho e balança junto com os confetes.
 
@@ -67,5 +71,6 @@ Primeira versão numerada depois do MVP. Reúne os PRs #1 a #4 e #10 a #15.
 ### Adicionado
 - MVP: lista de tarefas com SQLite local, tema escuro e notificação no vencimento.
 
-[Não lançado]: https://github.com/victor-pomaroli/notification-app/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/victor-pomaroli/notification-app/releases/tag/v1.1.0
+[Não lançado]: https://github.com/victor-pomaroli/ping-app/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.2.0
+[1.1.0]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.1.0
