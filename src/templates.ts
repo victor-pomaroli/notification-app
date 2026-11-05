@@ -38,8 +38,11 @@ const personalityTemplates:Record<'semPaciencia'|'deBoa',Record<TaskCategory,Rec
 export function reminderMessage(category:TaskCategory,stage:ReminderStage,variant=0,displayName='',addressStyle:AddressStyle='neutral',personality:NotificationPersonality='debochado'){
  const bank=personality==='debochado'?templates:personalityTemplates[personality];
  const options=bank[category]?.[stage]??bank.general[stage];
+ return personalize(options[Math.abs(variant)%options.length],variant+stage,displayName,addressStyle);
+}
+/** Troca {vocativo} e encaixa o nome da pessoa em posições alternadas (estável por `seed`). */
+function personalize(template:string,seed:number,displayName:string,addressStyle:AddressStyle){
  const vocativo=addressStyle==='masculine'?'campeão':addressStyle==='feminine'?'campeã':'pessoa';
- const template=options[Math.abs(variant)%options.length];
  const name=displayName.trim().slice(0,32);
  // Com nome definido, ele substitui o vocativo em vez de aparecer duas vezes.
  if(name&&template.includes('{vocativo}'))return template.replace(/\{vocativo\}/g,name);
@@ -47,7 +50,7 @@ export function reminderMessage(category:TaskCategory,stage:ReminderStage,varian
  if(!name)return message;
  // Alterna entre nome no início, no fim e nenhuma menção.
  // A mesma tarefa mantém a escolha em todos os reagendamentos.
- const position=Math.abs(variant+stage)%3;
+ const position=Math.abs(seed)%3;
  if(position===0){
    // Mensagens em CAIXA ALTA mantêm a primeira palavra intacta ("EI!", "BORA").
    const firstWord=message.split(/\s/)[0];
@@ -66,4 +69,62 @@ export function reminderMessage(category:TaskCategory,stage:ReminderStage,varian
 export function reminderOffsets(category: TaskCategory): readonly number[] {
   // Saúde usa um lembrete único por padrão; horários clínicos são definidos pelo usuário.
   return category === 'health' ? [0] : [0,15,60,180];
+}
+
+// ─── Eventos ─────────────────────────────────────────────────────────────────
+// Eventos são avisados ANTES de acontecer. A mensagem depende de quanto falta:
+// dias (≥ 1 dia), horas (≥ 1h), minutos (< 1h) ou agora (na hora do evento).
+// {tempo} vira "em 2 dias", "em 1h30", "em 10 min"... e {vocativo} segue a regra das tarefas.
+export type EventLead='dias'|'horas'|'minutos'|'agora';
+/** Opções de antecedência oferecidas no editor (minutos antes do início). */
+export const eventAlertOptions:readonly {minutes:number;label:string}[]=[
+  {minutes:0,label:'Na hora'},{minutes:5,label:'5 min'},{minutes:10,label:'10 min'},{minutes:15,label:'15 min'},
+  {minutes:30,label:'30 min'},{minutes:60,label:'1h'},{minutes:120,label:'2h'},
+  {minutes:1440,label:'1 dia'},{minutes:2880,label:'2 dias'},{minutes:10080,label:'1 semana'},
+];
+export const eventLead=(minutes:number):EventLead=>minutes<=0?'agora':minutes<60?'minutos':minutes<1440?'horas':'dias';
+export function eventLeadText(minutes:number){
+  if(minutes<=0)return 'agora';
+  if(minutes<60)return `em ${minutes} min`;
+  if(minutes<1440){const h=Math.floor(minutes/60),m=minutes%60;return `em ${h}h${m?String(m).padStart(2,'0'):''}`;}
+  if(minutes<10080){const d=Math.round(minutes/1440);return `em ${d} dia${d>1?'s':''}`;}
+  const w=Math.round(minutes/10080);return `em ${w} semana${w>1?'s':''}`;
+}
+const eventTemplates:Record<NotificationPersonality,Record<EventLead,readonly string[]>>={
+ debochado:{
+  dias:['Spoiler do seu calendário: compromisso {tempo}. Depois não diz que ninguém avisou. 📅','Seu eu do passado marcou um evento {tempo}. Só lembrando, sem pressão. Ou com um pouquinho.','Compromisso {tempo}. Dá tempo de se organizar. Dá até tempo de esquecer, por isso eu existo.'],
+  horas:['Começa {tempo}. Já pode ir pensando na roupa, {vocativo}. 👀','Seu compromisso é {tempo}. O relógio não negocia, eu já tentei.','Começa {tempo}. Aquele "depois eu vejo" virou "daqui a pouco".'],
+  minutos:['Começa {tempo}. Se ainda está de pijama, a hora é essa. 🏃','Seu evento começa {tempo}. Larga o celular. Depois de ler isso, claro.','Contagem regressiva ligada: começa {tempo}, {vocativo}.'],
+  agora:['Começou! Se você não está lá, pelo menos finge que está a caminho. 🏃','É agora. O compromisso chegou antes de você, de novo?','Hora do evento, {vocativo}. Pontualidade é um estilo de vida.'],
+ },
+ semPaciencia:{
+  dias:['ANOTA AÍ! Compromisso {tempo}. Nada de esquecer! 📅','TEM EVENTO CHEGANDO! É {tempo}. Já se organiza!','NÃO É PRA DEIXAR PRA DEPOIS! Seu compromisso é {tempo}.'],
+  horas:['ATENÇÃO! Começa {tempo}. Vai se arrumando!','O EVENTO É {tempo}! Nada de última hora, {vocativo}.','RELÓGIO CORRENDO! Seu compromisso começa {tempo}.'],
+  minutos:['CORRE! Começa {tempo}! 🏃','COMEÇA {tempo}! LARGA TUDO E VAI!','SAI AGORA, {vocativo}! O evento começa {tempo}.'],
+  agora:['COMEÇOU! JÁ ERA PRA VOCÊ ESTAR LÁ! 🏃','É AGORA! Nada de "já tô indo"!','HORA DO EVENTO, {vocativo}! VAI!'],
+ },
+ deBoa:{
+  dias:['Só um lembrete gentil: você tem um compromisso {tempo}. 🌿','Seu evento é {tempo}. Dá tempo de se preparar com calma.','Passando pra lembrar do seu compromisso {tempo}. Tudo no seu ritmo.'],
+  horas:['Seu compromisso começa {tempo}. Que tal ir se organizando?','Tem evento chegando: começa {tempo}, {vocativo}.','Começa {tempo}. Respira e vai se preparando. 🌿'],
+  minutos:['Começa {tempo}. Hora de ir com tranquilidade.','Seu evento está quase aí: começa {tempo}.','Já pode ir saindo, {vocativo}. Começa {tempo}.'],
+  agora:['Seu compromisso começou. Aproveite! 🌿','Chegou a hora do seu evento. Vai dar tudo certo.','É agora, {vocativo}. Bom compromisso!'],
+ },
+};
+/** Saúde mantém o tom neutro em todas as personalidades, como nas tarefas. */
+const healthEventTemplates:Record<EventLead,readonly string[]>={
+  dias:['Seu compromisso de saúde é {tempo}. Confira os detalhes com antecedência.'],
+  horas:['Seu compromisso de saúde começa {tempo}.'],
+  minutos:['Seu compromisso de saúde começa {tempo}. Confira se está tudo pronto.'],
+  agora:['Chegou a hora do seu compromisso de saúde.'],
+};
+/** Texto mostrado quando a pré-visualização privada está ligada. */
+export const privateEventMessage='Você tem um compromisso chegando. Abra o Ping para conferir.';
+/** Mensagem de aviso de evento, `minutesBefore` minutos antes do início. */
+export function eventReminderMessage(category:TaskCategory,minutesBefore:number,variant=0,displayName='',addressStyle:AddressStyle='neutral',personality:NotificationPersonality='debochado'){
+ const lead=eventLead(minutesBefore);
+ const options=category==='health'?healthEventTemplates[lead]:eventTemplates[personality][lead];
+ // Na personalidade "sem paciência" o tempo também vai em CAIXA ALTA para combinar com o grito.
+ const tempo=personality==='semPaciencia'&&category!=='health'?eventLeadText(minutesBefore).toUpperCase():eventLeadText(minutesBefore);
+ const template=options[Math.abs(variant)%options.length].replace(/\{tempo\}/g,tempo);
+ return personalize(template,variant+minutesBefore,displayName,addressStyle);
 }

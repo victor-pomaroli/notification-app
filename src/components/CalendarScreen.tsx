@@ -93,12 +93,22 @@ export function CalendarScreen({active,refreshKey,selected,onSelect}:{active:boo
         if(!valid)return <View key={i} style={s.cell}/>;
         const date=new Date(selected.getFullYear(),selected.getMonth(),d);const k=key(date);
         const isSelected=k===dayId,isToday=k===todayId;
-        const day=summary.get(k);const total=day?.total??0;const allDone=total>0&&day!.completed===total;
-        return <Pressable key={i} accessibilityRole="button" accessibilityState={{selected:isSelected}} accessibilityLabel={`${d} de ${monthStart.toLocaleDateString('pt-BR',{month:'long'})}, ${total} tarefa${total===1?'':'s'}`} onPress={()=>onSelect(date)} style={[s.cell,isSelected&&s.cellSelected,!isSelected&&isToday&&s.cellToday]}>
+        const day=summary.get(k);const total=day?.total??0;const events=day?.events??0;const allDone=total>0&&day!.completed===total;
+        const label=[total?`${total} tarefa${total===1?'':'s'}`:'',events?`${events} evento${events===1?'':'s'}`:''].filter(Boolean).join(' e ')||'nada marcado';
+        return <Pressable key={i} accessibilityRole="button" accessibilityState={{selected:isSelected}} accessibilityLabel={`${d} de ${monthStart.toLocaleDateString('pt-BR',{month:'long'})}, ${label}`} onPress={()=>onSelect(date)} style={[s.cell,isSelected&&s.cellSelected,!isSelected&&isToday&&s.cellToday]}>
           <Text style={[s.dayText,(isSelected||isToday)&&s.dayStrong,isSelected&&{color:c.background}]}>{d}</Text>
-          <View style={[s.dot,total===0&&{opacity:0},{backgroundColor:isSelected?c.background:allDone?c.muted:c.accent}]}/>
+          {/* Tarefas: bolinha na cor de realce. Eventos: bolinha azul ao lado. */}
+          <View style={s.dots}>
+            {total>0?<View style={[s.dot,{backgroundColor:isSelected?c.background:allDone?c.muted:c.accent}]}/>:null}
+            {events>0?<View style={[s.dot,{backgroundColor:c.event},isSelected&&{borderWidth:1,borderColor:c.background,width:6,height:6}]}/>:null}
+          </View>
         </Pressable>;
       })}
+    </View>
+
+    <View style={s.legend}>
+      <View style={[s.dot,{backgroundColor:c.accent,marginTop:0}]}/><Text style={s.legendText}>TAREFAS</Text>
+      <View style={[s.dot,{backgroundColor:c.event,marginTop:0,marginLeft:10}]}/><Text style={s.legendText}>EVENTOS</Text>
     </View>
 
     <View style={s.dayHead}>
@@ -144,7 +154,10 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
   cellToday:{borderWidth:1,borderColor:c.accent},
   dayText:{color:c.text,fontWeight:'500',fontSize:14},
   dayStrong:{fontWeight:'900',color:c.accent},
-  dot:{width:5,height:5,borderRadius:3,marginTop:4},
+  dots:{flexDirection:'row',gap:3,height:9,alignItems:'center',marginTop:2},
+  dot:{width:5,height:5,borderRadius:3},
+  legend:{flexDirection:'row',alignItems:'center',gap:5,justifyContent:'flex-end',marginTop:8},
+  legendText:{color:c.muted,fontSize:10,fontWeight:'800',letterSpacing:0.8},
   dayHead:{flexDirection:'row',alignItems:'center',gap:10,marginTop:22,marginBottom:6,paddingBottom:12,borderBottomWidth:1,borderBottomColor:c.border},
   dayTitle:{color:c.text,fontSize:18,fontWeight:'900'},
   dayMeta:{color:c.muted,fontSize:12,marginTop:4},
