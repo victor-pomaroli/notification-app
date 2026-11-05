@@ -1,5 +1,6 @@
 import React,{useCallback,useState} from 'react';
-import {View,Text,ScrollView,Pressable,Alert} from 'react-native';
+import {View,Text,ScrollView,Pressable} from 'react-native';
+import {showDialog,showError} from '../src/components/PingDialog';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {listRoutines,setRoutineActive,endRoutine,routineHistory,Task} from '../src/store';
 import {useAppTheme} from '../src/theme';
@@ -8,8 +9,8 @@ export default function Routines(){
  const [items,setItems]=useState<Task[]>([]);
  const [history,setHistory]=useState<Record<number,{day:string;completed:number}[]>>({});
  const load=useCallback(async()=>{const rows=await listRoutines();setItems(rows);const records=await Promise.all(rows.map(t=>routineHistory(t.id,7)));setHistory(Object.fromEntries(rows.map((t,i)=>[t.id,records[i]])));},[]);
- useFocusEffect(useCallback(()=>{load().catch(e=>Alert.alert('Erro',String(e)));},[load]));
- async function toggle(t:Task){try{await setRoutineActive(t.id,!t.daily_active);await load();}catch(e){Alert.alert('Erro',String(e));}}
+ useFocusEffect(useCallback(()=>{load().catch(e=>showError('Erro',e));},[load]));
+ async function toggle(t:Task){try{await setRoutineActive(t.id,!t.daily_active);await load();}catch(e){showError('Erro',e);}}
  return <ScrollView style={{flex:1,backgroundColor:c.background}} contentContainerStyle={{padding:22,paddingBottom:70,gap:16}}>
  <Text style={{fontSize:31,color:c.text,fontWeight:'900'}}>Minhas rotinas.</Text>
  <Text style={{color:c.muted,lineHeight:20}}>Pause, retome, edite ou encerre tarefas que se repetem diariamente. O histórico fica compacto.</Text>
@@ -21,7 +22,7 @@ export default function Routines(){
      <Pressable accessibilityRole="button" onPress={()=>toggle(t)} style={{backgroundColor:c.accentSoft,padding:11,borderRadius:7,flex:1,alignItems:'center'}}><Text style={{color:c.accent,fontWeight:'900'}}>{t.daily_active?'PAUSAR':'RETOMAR'}</Text></Pressable>
      <Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/edit',params:{id:String(t.id)}})} style={{backgroundColor:c.surfaceRaised,padding:11,borderRadius:7,flex:1,alignItems:'center'}}><Text style={{color:c.text,fontWeight:'900'}}>EDITAR</Text></Pressable>
    </View>
-   <Pressable accessibilityRole="button" onPress={()=>Alert.alert('Encerrar rotina?', 'A tarefa deixará de se repetir. O histórico será preservado.',[{text:'Cancelar',style:'cancel'},{text:'Encerrar',style:'destructive',onPress:()=>endRoutine(t.id).then(load).catch(e=>Alert.alert('Erro',String(e)))}])}><Text style={{color:c.muted,fontSize:12,textAlign:'center',textDecorationLine:'underline'}}>Encerrar repetição</Text></Pressable>
+   <Pressable accessibilityRole="button" onPress={()=>showDialog({eyebrow:'PING / ROTINA',title:'Encerrar rotina?',message:'A tarefa deixará de se repetir. O histórico será preservado.',cancelLabel:'MANTER',confirmLabel:'ENCERRAR',destructive:true,onConfirm:()=>endRoutine(t.id).then(load).catch(e=>showError('Não foi possível encerrar',e))})}><Text style={{color:c.muted,fontSize:12,textAlign:'center',textDecorationLine:'underline'}}>Encerrar repetição</Text></Pressable>
    <Text style={{color:c.muted,fontSize:11}}>ÚLTIMOS REGISTROS</Text>
    <Text style={{color:c.text,fontSize:12}}>{history[t.id]?.length?history[t.id].map(h=>h.day.slice(5)+' '+(h.completed?'✓':'–')).join('  ·  '):'Nenhuma conclusão registrada ainda'}</Text>
  </View>)}

@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import {Platform} from 'react-native';
 import {getPreferences} from './preferences';
-import {reminderMessage,reminderOffsets,TaskCategory,ReminderStage} from './templates';
+import {reminderMessage,reminderOffsets,TaskCategory,ReminderStage,eventReminderMessage,privateEventMessage} from './templates';
 
 Notifications.setNotificationHandler({
   handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false}),
@@ -14,10 +14,16 @@ export const TASK_CATEGORY='task_due';
 export const ACTION_COMPLETE='complete';
 export const ACTION_SNOOZE='snooze';
 export const SNOOZE_MINUTES=15;
+/** Eventos: categoria própria, sem "Concluir", e "Lembrar de novo" em 10 min. */
+export const EVENT_CATEGORY='event_alert';
+export const EVENT_SNOOZE_MINUTES=10;
+/** Etapas dos avisos de evento começam aqui para não colidir com as de tarefas. */
+const EVENT_STAGE_BASE=20;
 /** Etapa usada para lembretes adiados pelo botão "Adiar". */
 export const SNOOZE_STAGE=9;
 export type ScheduledReminder={notification_id:string;stage:number;scheduled_at:number};
 export type ReminderTask={id:number;title:string;due_at:number;category:TaskCategory;daily?:boolean};
+export type EventReminder={id:number;title:string;due_at:number;category:TaskCategory;location:string;offsets:number[]};
 
 /** Cria canal e botões de ação. Não pede permissão: isso acontece após o onboarding. */
 export async function setupNotifications(){
@@ -29,6 +35,9 @@ export async function setupNotifications(){
   await Notifications.setNotificationCategoryAsync(TASK_CATEGORY,[
     {identifier:ACTION_COMPLETE,buttonTitle:'Concluir',options:{opensAppToForeground:false}},
     {identifier:ACTION_SNOOZE,buttonTitle:`Adiar ${SNOOZE_MINUTES} min`,options:{opensAppToForeground:false}},
+  ]);
+  await Notifications.setNotificationCategoryAsync(EVENT_CATEGORY,[
+    {identifier:ACTION_SNOOZE,buttonTitle:`Lembrar em ${EVENT_SNOOZE_MINUTES} min`,options:{opensAppToForeground:false}},
   ]);
 }
 /** Pede a permissão de notificações se ainda for possível perguntar. */
@@ -86,6 +95,51 @@ export async function scheduleTaskReminders(task:ReminderTask):Promise<Scheduled
     }
     return result;
   }catch(e){await cancelTaskReminders(result.map(x=>x.notification_id));throw e;}
+}
+async function buildEventContent(ev:EventReminder,minutesBefore:number,variant:number,stage:number):Promise<Notifications.NotificationContentInput>{
+  const prefs=await getPreferences();
+  const where=ev.location.trim()?`\n📍 ${ev.location.trim()}`:'';
+  return {
+    title:prefs.privatePreviews?'Ping · evento':ev.title,
+    body:prefs.privatePreviews?privateEventMessage:eventReminderMessage(ev.category,minutesBefore,variant,prefs.displayName,prefs.addressStyle,prefs.personality)+where,
+    data:{kind:'event_alert',taskId:ev.id,stage},
+    categoryIdentifier:EVENT_CATEGORY,
+  };
+}
+/**
+ * Avisos de evento: um para cada antecedência escolhida (até 3), sempre ANTES do início.
+ * Os que já passaram são ignorados. O mais próximo do evento usa `alarmClock` para não atrasar.
+ */
+export async function scheduleEventAlerts(ev:EventReminder):Promise<ScheduledReminder[]>{
+  const prefs=await getPreferences();
+  if(!prefs.notifications||!ev.offsets.length)return [];
+  const permission=await Notifications.getPermissionsAsync();
+  if(!permission.granted){console.warn('[notifications] Permission not granted');return [];}
+  const offsets=[...new Set(ev.offsets)].sort((a,b)=>b-a);
+  const closest=Math.min(...offsets);
+  const result:ScheduledReminder[]=[];
+  try{
+    for(let i=0;i<offsets.length;i++){
+      const at=ev.due_at-offsets[i]*60000;
+      if(at<=Date.now())continue;
+      const stage=EVENT_STAGE_BASE+i;
+      const id=await Notifications.scheduleNotificationAsync({
+        content:await buildEventContent(ev,offsets[i],ev.id+i,stage),
+        trigger:dateTrigger(at,offsets[i]===closest?'alarmClock':'bestEffort'),
+      });
+      result.push({notification_id:id,stage,scheduled_at:at});
+    }
+    return result;
+  }catch(e){await cancelTaskReminders(result.map(x=>x.notification_id));throw e;}
+}
+/** Botão "Lembrar em 10 min" de um evento: o texto fala de quanto vai faltar nesse momento. */
+export async function scheduleEventSnooze(ev:EventReminder):Promise<ScheduledReminder|null>{
+  const prefs=await getPreferences();
+  if(!prefs.notifications)return null;
+  const at=Date.now()+EVENT_SNOOZE_MINUTES*60000;
+  const remaining=Math.max(0,Math.round((ev.due_at-at)/60000));
+  const id=await Notifications.scheduleNotificationAsync({content:await buildEventContent(ev,remaining,ev.id+1,SNOOZE_STAGE),trigger:dateTrigger(at)});
+  return {notification_id:id,stage:SNOOZE_STAGE,scheduled_at:at};
 }
 /** Agenda um único lembrete daqui a SNOOZE_MINUTES (botão "Adiar"). */
 export async function scheduleSnoozeReminder(task:ReminderTask):Promise<ScheduledReminder|null>{

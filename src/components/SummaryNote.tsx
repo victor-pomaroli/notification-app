@@ -11,6 +11,12 @@ type Props={appearance:Appearance;page:string;left:number;overdue:number;today:n
 
 const pad=(n:number)=>String(n).padStart(2,'0');
 const plural=(n:number,one:string,many:string)=>`${n} ${n===1?one:many}`;
+/** Rótulo que muda com o estado do dia, em vez de um título fixo. */
+function moodLabel(left:number,overdue:number,done:number){
+  if(overdue>0)return 'TÁ DEVENDO';
+  if(left>0)return done>0&&left<=2?'FALTA POUCO':'AINDA HOJE';
+  return done>0?'MISSÃO CUMPRIDA':'DIA EM BRANCO';
+}
 
 export function SummaryNote({appearance,page,left,overdue,today,done}:Props){
   const look=appearance==='dark'?dark:light;
@@ -21,7 +27,7 @@ export function SummaryNote({appearance,page,left,overdue,today,done}:Props){
       {appearance==='dark'
         ?<View style={dark.binding}><View style={dark.holes}>{[0,1,2,3,4].map(i=><View key={i} style={[dark.hole,{backgroundColor:page}]}><View style={[dark.ring,{backgroundColor:page}]}/></View>)}</View></View>
         :<LiftedPaper/>}
-      <Text style={[base.label,{color:look.ink}]}>O RESUMO DA ÓPERA</Text>
+      <Text style={[base.label,{color:look.ink}]}>{moodLabel(left,overdue,done)}</Text>
       <View style={base.numbers}>
         <Text style={[base.big,{color:look.ink}]}>{pad(left)}</Text>
         <View style={base.side}>
@@ -65,7 +71,7 @@ function Progress({done,total,ink,empty}:{done:number;total:number;ink:string;em
 const base=StyleSheet.create({
   label:{fontWeight:'900',letterSpacing:2,fontSize:10},
   numbers:{flexDirection:'row',alignItems:'center',gap:18,marginTop:4},
-  big:{fontSize:86,fontWeight:'900',letterSpacing:-6,includeFontPadding:false},
+  big:{fontSize:58,fontWeight:'900',letterSpacing:-4,includeFontPadding:false},
   side:{gap:6},
   sideBig:{fontWeight:'900',fontSize:17},
   sideSmall:{fontWeight:'600',fontSize:14},
@@ -82,9 +88,9 @@ const base=StyleSheet.create({
 const dark={
   paper:'#D7FC65',ink:'#111310',rule:'rgba(17,19,16,0.25)',curlColor:'',
   ...StyleSheet.create({
-    wrap:{marginTop:8,marginBottom:33,marginHorizontal:4},
+    wrap:{marginTop:4,marginBottom:12,marginHorizontal:4},
     sheet:{borderRadius:3,paddingHorizontal:22,paddingBottom:20,transform:[{rotate:'-1.4deg'}],elevation:3,shadowColor:'#000',shadowOffset:{width:0,height:3},shadowOpacity:0.2,shadowRadius:6},
-    binding:{height:30,marginHorizontal:-22,marginBottom:16,backgroundColor:'#B5D653',borderTopLeftRadius:3,borderTopRightRadius:3},
+    binding:{height:24,marginHorizontal:-22,marginBottom:12,backgroundColor:'#B5D653',borderTopLeftRadius:3,borderTopRightRadius:3},
     holes:{position:'absolute',top:-7,right:22,flexDirection:'row',gap:16},
     hole:{width:13,height:17,borderRadius:7},
     ring:{position:'absolute',left:5,top:13,width:3,height:9,borderRadius:2},
@@ -95,8 +101,8 @@ const dark={
 const light={
   paper:'#F3F1A6',ink:'#2B3020',rule:'rgba(43,48,32,0.22)',curlColor:'#D9D681',shadow:'rgba(91,90,42,0.16)',corner:30,
   ...StyleSheet.create({
-    wrap:{marginTop:14,marginBottom:33,marginHorizontal:6},
-    sheet:{padding:22,paddingTop:26,paddingBottom:30,transform:[{rotate:'1.2deg'}]},
+    wrap:{marginTop:10,marginBottom:12,marginHorizontal:6},
+    sheet:{padding:20,paddingTop:22,paddingBottom:24,transform:[{rotate:'1.2deg'}]},
     piece:{position:'absolute'},
     // Aba dobrada: metade de cima-esquerda do quadrado do canto.
     flap:{position:'absolute',width:0,height:0,borderTopWidth:30,borderRightWidth:30,borderRightColor:'transparent'},

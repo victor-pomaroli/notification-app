@@ -8,6 +8,7 @@ import {initDB,reconcileReminders} from '../src/store';
 import {setupNotifications,ensureNotificationPermission} from '../src/notifications';
 import {handleNotificationResponse} from '../src/notification-actions';
 import {ThemeProvider,useAppTheme} from '../src/theme';
+import {DialogHost} from '../src/components/PingDialog';
 function AppStack(){
   const {colors:theme,appearance}=useAppTheme();
   const router=useRouter();
@@ -35,6 +36,6 @@ function AppStack(){
   return <><StatusBar style={appearance==='dark'?"light":"dark"}/><Stack screenOptions={{
     headerStyle:{backgroundColor:theme.background},headerTintColor:theme.text,
     headerShadowVisible:false,contentStyle:{backgroundColor:theme.background},
-  }}><Stack.Screen name="index" options={{headerShown:false}}/><Stack.Screen name="onboarding" options={{headerShown:false,gestureEnabled:false}}/><Stack.Screen name="settings" options={{title:"Ajustes"}}/><Stack.Screen name="routines" options={{title:"Minhas rotinas"}}/><Stack.Screen name="archive" options={{title:"Histórico"}}/><Stack.Screen name="edit" options={{title:'Detalhes da tarefa'}}/></Stack></>;
+  }}><Stack.Screen name="index" options={{headerShown:false}}/><Stack.Screen name="onboarding" options={{headerShown:false,gestureEnabled:false}}/><Stack.Screen name="settings" options={{title:"Ajustes"}}/><Stack.Screen name="routines" options={{title:"Minhas rotinas"}}/><Stack.Screen name="archive" options={{title:"Histórico"}}/><Stack.Screen name="edit" options={{title:'Detalhes da tarefa'}}/></Stack><DialogHost/></>;
 }
 export default function Layout(){return <ThemeProvider><AppStack/></ThemeProvider>;}

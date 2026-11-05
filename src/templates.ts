@@ -78,9 +78,8 @@ export function reminderOffsets(category: TaskCategory): readonly number[] {
 export type EventLead='dias'|'horas'|'minutos'|'agora';
 /** Opções de antecedência oferecidas no editor (minutos antes do início). */
 export const eventAlertOptions:readonly {minutes:number;label:string}[]=[
-  {minutes:0,label:'Na hora'},{minutes:5,label:'5 min'},{minutes:10,label:'10 min'},{minutes:15,label:'15 min'},
-  {minutes:30,label:'30 min'},{minutes:60,label:'1h'},{minutes:120,label:'2h'},
-  {minutes:1440,label:'1 dia'},{minutes:2880,label:'2 dias'},{minutes:10080,label:'1 semana'},
+  {minutes:0,label:'Na hora'},{minutes:15,label:'15 min'},{minutes:30,label:'30 min'},
+  {minutes:60,label:'1h'},{minutes:1440,label:'1 dia'},
 ];
 export const eventLead=(minutes:number):EventLead=>minutes<=0?'agora':minutes<60?'minutos':minutes<1440?'horas':'dias';
 export function eventLeadText(minutes:number){

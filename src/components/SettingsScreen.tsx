@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react';
-import {View,Text,Switch,Pressable,StyleSheet,Alert,Linking,TextInput} from 'react-native';
+import {View,Text,Switch,Pressable,StyleSheet,Linking,TextInput} from 'react-native';
+import {showDialog,showError} from './PingDialog';
 import * as Notifications from 'expo-notifications';
 import {getPreferences,setPreference,Preferences,AddressStyle,NotificationPersonality} from '../preferences';
 import {rescheduleAllReminders,deleteAllTasks} from '../store';
@@ -9,7 +10,7 @@ import {useAppTheme,ThemeColors,Appearance,palettes} from '../theme';
 export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
  const {colors:c,appearance,changeAppearance}=useAppTheme();
  const s=React.useMemo(()=>createStyles(c),[c]);
- const [prefs,setPrefs]=useState<Preferences>({notifications:true,privatePreviews:false,appearance:'dark',displayName:'',addressStyle:'neutral',personality:'debochado'});
+ const [prefs,setPrefs]=useState<Preferences>({notifications:true,privatePreviews:false,appearance:'dark',displayName:'',addressStyle:'neutral',personality:'debochado',eventAlerts:[30]});
  const [busy,setBusy]=useState(false);
  const [permission,setPermission]=useState('Verificando...');
  const [themeBusy,setThemeBusy]=useState(false);
@@ -25,15 +26,15 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
      await setPreference('displayName',name);
      setPrefs(prev=>({...prev,displayName:name}));
      await rescheduleAllReminders();
-     Alert.alert('Salvo','As próximas notificações vão usar seu nome.');
-   }catch(e){Alert.alert('Erro ao salvar perfil',String(e));}
+     showDialog({eyebrow:'PING / RECADO',title:'Salvo',message:'As próximas notificações vão usar seu nome.'});
+   }catch(e){showError('Erro ao salvar perfil',e);}
    finally{setBusy(false);}
  }
  async function chooseAddressStyle(value:AddressStyle){
    if(busy)return;
    setBusy(true);
    try{await setPreference('addressStyle',value);setPrefs(prev=>({...prev,addressStyle:value}));await rescheduleAllReminders();}
-   catch(e){Alert.alert('Erro ao salvar tratamento',String(e));}
+   catch(e){showError('Erro ao salvar tratamento',e);}
    finally{setBusy(false);}
  }
  async function choosePersonality(value:NotificationPersonality){
@@ -44,24 +45,24 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
      setPrefs(prev=>({...prev,personality:value}));
      await rescheduleAllReminders();
      await checkScheduled();
-   }catch(e){Alert.alert('Não foi possível salvar a personalidade',String(e));}
+   }catch(e){showError('Não foi possível salvar a personalidade',e);}
    finally{setBusy(false);}
  }
  async function checkScheduled(){
    try{const entries=await Notifications.getAllScheduledNotificationsAsync();setScheduledCount(entries.filter(n=>n.content.data?.kind==='task_due').length);}
-   catch(e){Alert.alert('Não foi possível consultar',String(e));}
+   catch(e){showError('Não foi possível consultar',e);}
  }
  async function sendTest(){
    if(testing)return;
    setTesting(true);
-   try{await testNotification();Alert.alert('Teste agendado','O Ping programou uma notificação para daqui a 10 segundos. Bloqueie a tela ou feche o app para verificar.');}
-   catch(e){Alert.alert('Teste não agendado',String(e));}
+   try{await testNotification();showDialog({eyebrow:'PING / RECADO',title:'Teste agendado',message:'O Ping programou uma notificação para daqui a 10 segundos. Bloqueie a tela ou feche o app para verificar.'});}
+   catch(e){showError('Teste não agendado',e);}
    finally{setTesting(false);}
  }
  async function chooseTheme(next:Appearance){
    if(themeBusy||next===appearance)return;
    setThemeBusy(true);
-   try{await changeAppearance(next);}catch(e){Alert.alert('Não foi possível salvar o tema',String(e));}
+   try{await changeAppearance(next);}catch(e){showError('Não foi possível salvar o tema',e);}
    finally{setThemeBusy(false);}
  }
  useEffect(()=>{getPreferences().then(setPrefs).catch(console.warn);checkPermission();checkScheduled();},[]);
@@ -76,20 +77,17 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
      await setPreference(key,value);
      setPrefs(prev=>({...prev,[key]:value}));
      await rescheduleAllReminders();
-   }catch(e){Alert.alert('Não foi possível salvar',String(e));}
+   }catch(e){showError('Não foi possível salvar',e);}
    finally{setBusy(false);}
  }
  function confirmDelete(){
-   Alert.alert('Apagar todas as tarefas?','Essa ação exclui permanentemente todas as tarefas e cancela seus lembretes. Não é possível desfazer.',[
-     {text:'Cancelar',style:'cancel'},
-     {text:'Apagar tudo',style:'destructive',onPress:async()=>{
-       if(busy)return;
-       setBusy(true);
-       try{await deleteAllTasks();onDataDeleted();Alert.alert('Pronto','Todas as tarefas foram apagadas.');}
-       catch(e){Alert.alert('Não foi possível apagar',String(e));}
-       finally{setBusy(false);}
-     }}
-   ]);
+   showDialog({eyebrow:'PING / EXCLUSÃO',title:'Apagar todas as tarefas?',message:'Essa ação exclui permanentemente todas as tarefas e cancela seus lembretes. Não é possível desfazer.',cancelLabel:'CANCELAR',confirmLabel:'APAGAR TUDO',destructive:true,onConfirm:async()=>{
+     if(busy)return;
+     setBusy(true);
+     try{await deleteAllTasks();onDataDeleted();showDialog({eyebrow:'PING / RECADO',title:'Pronto',message:'Todas as tarefas foram apagadas.'});}
+     catch(e){showError('Não foi possível apagar',e);}
+     finally{setBusy(false);}
+   }});
  }
  return <View>
    <Text style={s.kicker}>PING / CONTROLE</Text>
@@ -157,7 +155,7 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
      <View style={s.separator}/>
      <Pressable accessibilityRole="button" disabled={testing} style={s.row} onPress={sendTest}><View style={s.copy}><Text style={s.title}>Testar notificação em 10 segundos</Text><Text style={s.detail}>Agenda um aviso de teste para verificar a entrega pelo Android, inclusive com o aplicativo fechado.</Text></View></Pressable>
      <View style={s.separator}/>
-     <Pressable style={s.row} onPress={()=>Linking.openSettings().catch(e=>Alert.alert('Erro',String(e)))}><View style={s.copy}><Text style={s.title}>Permissões do Android ↗</Text><Text style={s.detail}>Status: {permission}. Ajuste sons, alertas e permissões nas configurações do aparelho.</Text></View></Pressable>
+     <Pressable style={s.row} onPress={()=>Linking.openSettings().catch(e=>showError('Erro',e))}><View style={s.copy}><Text style={s.title}>Permissões do Android ↗</Text><Text style={s.detail}>Status: {permission}. Ajuste sons, alertas e permissões nas configurações do aparelho.</Text></View></Pressable>
    </View>
    <Text style={s.section}>PRIVACIDADE E DADOS</Text>
    <View style={s.panel}>
