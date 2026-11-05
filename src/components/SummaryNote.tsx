@@ -1,5 +1,5 @@
-import React from 'react';
-import {View,Text,StyleSheet} from 'react-native';
+import React,{useEffect,useRef} from 'react';
+import {View,Text,StyleSheet,Animated,Easing} from 'react-native';
 import type {Appearance} from '../theme';
 
 /**
@@ -7,7 +7,7 @@ import type {Appearance} from '../theme';
  * - escuro: folha de bloco arrancada (faixa da espiral com furos) presa por fita verde-água;
  * - claro: post-it quadrado clássico com tachinha e a ponta de baixo levantando.
  */
-type Props={appearance:Appearance;page:string;left:number;overdue:number;today:number;done:number};
+type Props={appearance:Appearance;page:string;left:number;overdue:number;today:number;done:number;celebrateKey?:number};
 
 const pad=(n:number)=>String(n).padStart(2,'0');
 const plural=(n:number,one:string,many:string)=>`${n} ${n===1?one:many}`;
@@ -18,10 +18,32 @@ function moodLabel(left:number,overdue:number,done:number){
   return done>0?'MISSÃO CUMPRIDA':'DIA EM BRANCO';
 }
 
-export function SummaryNote({appearance,page,left,overdue,today,done}:Props){
+export function SummaryNote({appearance,page,left,overdue,today,done,celebrateKey=0}:Props){
   const look=appearance==='dark'?dark:light;
   const total=left+done;
-  return <View style={look.wrap}>
+  // Comemoração: o papel dá um pulinho e balança preso na fita/tachinha, amortecendo até parar.
+  const wobble=useRef(new Animated.Value(0)).current;
+  const lift=useRef(new Animated.Value(0)).current;
+  useEffect(()=>{
+    if(celebrateKey<=0)return;
+    wobble.setValue(0);lift.setValue(0);
+    const swing=(to:number,duration:number)=>Animated.timing(wobble,{toValue:to,duration,easing:Easing.inOut(Easing.sin),useNativeDriver:true});
+    const animation=Animated.parallel([
+      Animated.sequence([
+        Animated.timing(lift,{toValue:1,duration:160,easing:Easing.out(Easing.quad),useNativeDriver:true}),
+        Animated.spring(lift,{toValue:0,friction:4,tension:120,useNativeDriver:true}),
+      ]),
+      Animated.sequence([swing(1,140),swing(-0.85,180),swing(0.6,170),swing(-0.4,160),swing(0.2,150),swing(0,140)]),
+    ]);
+    animation.start();
+    return()=>animation.stop();
+  },[celebrateKey]);
+  const motion={transform:[
+    {translateY:lift.interpolate({inputRange:[0,1],outputRange:[0,-10]})},
+    {scale:lift.interpolate({inputRange:[0,1],outputRange:[1,1.04]})},
+    {rotate:wobble.interpolate({inputRange:[-1,1],outputRange:['-5deg','5deg']})},
+  ]};
+  return <Animated.View style={[look.wrap,motion]}>
     {appearance==='dark'?<View pointerEvents="none" style={dark.tape}/>:null}
     <View style={[look.sheet,appearance==='dark'&&{backgroundColor:look.paper}]}>
       {appearance==='dark'
@@ -42,7 +64,7 @@ export function SummaryNote({appearance,page,left,overdue,today,done}:Props){
       </View>
       {appearance==='softLight'?<View pointerEvents="none" style={light.pin}><View style={light.pinShine}/></View>:null}
     </View>
-  </View>;
+  </Animated.View>;
 }
 
 /**

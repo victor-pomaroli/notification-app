@@ -19,7 +19,11 @@ A cada versão:
 
 ## [Não lançado]
 
-_Nada ainda._
+### Adicionado
+- O post-it da aba Hoje dá um pulinho e balança junto com os confetes.
+
+### Corrigido
+- Os confetes saíam toda vez que você voltava para a aba Hoje. Agora a comemoração acontece uma vez por "tudo cumprido": só se repete se você concluir mais alguma tarefa no mesmo dia. Também não se repete ao reabrir o app.
 
 ## [1.1.0] — 2026-11-05
 
