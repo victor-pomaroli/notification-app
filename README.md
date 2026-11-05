@@ -5,7 +5,7 @@
 - **O que é o Ping, para quem é e como funciona:** [PRODUCT.md](PRODUCT.md)
 - **Versões e o que mudou em cada uma:** [CHANGELOG.md](CHANGELOG.md)
 
-Versão atual: **1.1.0**
+Versão atual: **1.2.0**
 
 ## Destaques
 

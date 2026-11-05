@@ -13,6 +13,7 @@ import {sortTasks,sectionTasks} from '../src/task-order';
 import {EventCard} from '../src/components/EventCard';
 import {Confetti} from '../src/components/Confetti';
 import {takePendingHighlight,onHighlightRequest} from '../src/highlight';
+import {getMeta,setMeta} from '../src/preferences';
 
 type Tab='home'|'tasks'|'calendar';
 const formatDate=(timestamp:number)=>new Date(timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -202,14 +203,21 @@ export default function Home(){
     {groupedCards(section.tasks,filteredPage,{dayKnown:/^d\d/.test(section.key),page:'tasks'})}
   </React.Fragment>;
   const homeHasPending=overdue.length+agenda.length+upcoming.length>0;
-  // Confete de recompensa: ao chegar na aba Hoje com tudo feito, ou ao concluir a última estando nela.
+  // Comemoração (confete + post-it balançando): uma vez por "tudo cumprido". A assinatura é o dia
+  // + as concluídas de hoje; só comemora de novo se ela mudar (ex.: criou e concluiu outra tarefa).
+  // Fica salva no banco, então trocar de aba ou reabrir o app não repete. Se tudo for concluído
+  // fora da aba Hoje (widget, notificação, Tarefas), comemora na próxima vez que ela abrir.
   const allDone=!homeHasPending&&completedToday.length>0;
-  const confettiState=useRef<{tab:Tab|null;allDone:boolean}>({tab:null,allDone:false});
+  const celebration=allDone?`${localDay(new Date(now))}:${completedToday.map(t=>t.id).sort((a,b)=>a-b).join(',')}`:'';
+  const celebrated=useRef<string|null>(null);
+  const [celebratedLoaded,setCelebratedLoaded]=useState(false);
+  React.useEffect(()=>{getMeta('celebratedAllDone').then(v=>{celebrated.current=v;}).catch(()=>{}).finally(()=>setCelebratedLoaded(true));},[]);
   React.useEffect(()=>{
-    const prev=confettiState.current;
-    if(tab==='home'&&allDone&&(prev.tab!=='home'||!prev.allDone))setConfettiKey(k=>k+1);
-    confettiState.current={tab,allDone};
-  },[tab,allDone]);
+    if(tab!=='home'||!celebration||!celebratedLoaded||celebrated.current===celebration)return;
+    celebrated.current=celebration;
+    setMeta('celebratedAllDone',celebration).catch(console.warn);
+    setConfettiKey(k=>k+1);
+  },[tab,celebration,celebratedLoaded]);
   React.useEffect(()=>{
     if(!highlightRequest)return;
     const found=tasks.find(t=>t.id===highlightRequest.id);
@@ -263,7 +271,7 @@ export default function Home(){
       <Text style={s.eyebrow}>{greetings[(new Date(now).getDay()+6)%7]}  /  {new Date(now).toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}).toUpperCase()}</Text>
       {page==='home'?<Text style={s.heading}>{'Seu dia.\nSem desculpas.'}</Text>:page==='calendar'?<Text style={s.heading}>{'Seu tempo.\nSeu ritmo.'}</Text>:null}
       {page==='home'?<>
-        <SummaryNote appearance={appearance} page={c.background} left={overdue.length+todayAhead.length} overdue={overdue.length} today={todayAhead.length} done={completedToday.length}/>
+        <SummaryNote appearance={appearance} page={c.background} left={overdue.length+todayAhead.length} overdue={overdue.length} today={todayAhead.length} done={completedToday.length} celebrateKey={confettiKey}/>
         {/* Ordem de urgência: atrasadas → agenda → radar. Seções vazias não aparecem. */}
         {overdue.length?<>{sectionHead('PASSOU DA HORA',overdue.length,c.danger)}{groupedCards(overdue,tasks,{page:'home'})}</>:null}
         {agenda.length?<>{sectionHead('AGENDA DE HOJE',agenda.length)}{groupedCards(agenda,tasks,{dayKnown:true,page:'home'})}</>:null}
