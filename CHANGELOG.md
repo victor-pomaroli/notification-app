@@ -21,6 +21,12 @@ A cada versão:
 
 _Nada ainda._
 
+## [1.2.1] — 2026-11-05
+
+### Corrigido
+- Os confetes não saíam ao zerar o dia pela segunda vez (ex.: concluir tudo, criar outra tarefa e concluir de novo, ou reabrir e concluir a mesma). Agora toda vez que Hoje volta a ter algo pendente, a próxima vez que você zerar tem comemoração.
+- Eventos do dia não impedem mais a comemoração: só tarefas contam como pendentes.
+
 ## [1.2.0] — 2026-11-05
 
 ### Adicionado
@@ -71,6 +77,7 @@ Primeira versão numerada depois do MVP. Reúne os PRs #1 a #4 e #10 a #15.
 ### Adicionado
 - MVP: lista de tarefas com SQLite local, tema escuro e notificação no vencimento.
 
-[Não lançado]: https://github.com/victor-pomaroli/ping-app/compare/v1.2.0...HEAD
+[Não lançado]: https://github.com/victor-pomaroli/ping-app/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.2.1
 [1.2.0]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.2.0
 [1.1.0]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.1.0

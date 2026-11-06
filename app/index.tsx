@@ -203,21 +203,29 @@ export default function Home(){
     {groupedCards(section.tasks,filteredPage,{dayKnown:/^d\d/.test(section.key),page:'tasks'})}
   </React.Fragment>;
   const homeHasPending=overdue.length+agenda.length+upcoming.length>0;
-  // Comemoração (confete + post-it balançando): uma vez por "tudo cumprido". A assinatura é o dia
-  // + as concluídas de hoje; só comemora de novo se ela mudar (ex.: criou e concluiu outra tarefa).
-  // Fica salva no banco, então trocar de aba ou reabrir o app não repete. Se tudo for concluído
-  // fora da aba Hoje (widget, notificação, Tarefas), comemora na próxima vez que ela abrir.
-  const allDone=!homeHasPending&&completedToday.length>0;
-  const celebration=allDone?`${localDay(new Date(now))}:${completedToday.map(t=>t.id).sort((a,b)=>a-b).join(',')}`:'';
+  // Comemoração (confete + post-it balançando): toda vez que o dia é zerado. Ao ver alguma tarefa
+  // pendente em Hoje, a comemoração é "rearmada"; ao zerar de novo (concluiu uma nova, ou reabriu e
+  // concluiu a mesma), solta outra vez. Fica salva no banco com o dia, então trocar de aba ou reabrir
+  // o app sem nada novo não repete. Se zerar fora da aba Hoje (widget, notificação, Tarefas),
+  // comemora na próxima vez que ela abrir. Eventos não contam: não têm o que concluir.
+  const tasksPending=overdue.length+upcoming.length>0;
+  const allDone=!tasksPending&&completedToday.length>0;
+  const dayStamp=localDay(new Date(now));
   const celebrated=useRef<string|null>(null);
   const [celebratedLoaded,setCelebratedLoaded]=useState(false);
   React.useEffect(()=>{getMeta('celebratedAllDone').then(v=>{celebrated.current=v;}).catch(()=>{}).finally(()=>setCelebratedLoaded(true));},[]);
   React.useEffect(()=>{
-    if(tab!=='home'||!celebration||!celebratedLoaded||celebrated.current===celebration)return;
-    celebrated.current=celebration;
-    setMeta('celebratedAllDone',celebration).catch(console.warn);
+    if(!celebratedLoaded)return;
+    if(tasksPending){
+      // Voltou a ter o que fazer: a próxima vez que zerar merece confete.
+      if(celebrated.current){celebrated.current='';setMeta('celebratedAllDone','').catch(console.warn);}
+      return;
+    }
+    if(tab!=='home'||!allDone||celebrated.current===dayStamp)return;
+    celebrated.current=dayStamp;
+    setMeta('celebratedAllDone',dayStamp).catch(console.warn);
     setConfettiKey(k=>k+1);
-  },[tab,celebration,celebratedLoaded]);
+  },[tab,tasksPending,allDone,dayStamp,celebratedLoaded]);
   React.useEffect(()=>{
     if(!highlightRequest)return;
     const found=tasks.find(t=>t.id===highlightRequest.id);
