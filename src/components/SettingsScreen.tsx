@@ -5,7 +5,7 @@ import * as Notifications from 'expo-notifications';
 import {getPreferences,setPreference,Preferences,AddressStyle,NotificationPersonality} from '../preferences';
 import {rescheduleAllReminders,deleteAllTasks} from '../store';
 import {testNotification} from '../notifications';
-import {useAppTheme,ThemeColors,Appearance,palettes} from '../theme';
+import {useAppTheme,ThemeColors,Appearance,palettes,appearances,appearanceNames} from '../theme';
 
 export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
  const {colors:c,appearance,changeAppearance}=useAppTheme();
@@ -96,7 +96,7 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
    <Text style={s.section}>APARÊNCIA</Text>
    <Text style={s.detail}>Escolha como o Ping aparece. A preferência fica salva neste aparelho.</Text>
    <View style={s.themeRow}>
-     {(['dark','softLight'] as Appearance[]).map(key=>{
+     {appearances.map(key=>{
        const palette=palettes[key],selected=appearance===key;
        return <Pressable key={key} accessibilityRole="radio" accessibilityState={{checked:selected}}
          disabled={themeBusy} onPress={()=>chooseTheme(key)} style={[s.themeOption,selected&&s.themeOptionSelected]}>
@@ -112,7 +112,7 @@ export function SettingsScreen({onDataDeleted}:{onDataDeleted:()=>void}){
              <View style={[s.previewDot,{backgroundColor:palette.muted}]}/>
            </View>
          </View>
-         <Text style={s.themeName}>{key==='dark'?'Original escuro':'Claro suave'}</Text>
+         <Text style={s.themeName}>{appearanceNames[key]}</Text>
          <Text style={s.themeState}>{selected?'✓ SELECIONADO':'TOQUE PARA USAR'}</Text>
        </Pressable>;
      })}
@@ -176,8 +176,8 @@ const createStyles=(c:ThemeColors)=>StyleSheet.create({
  saveButton:{alignItems:'center',padding:13,borderRadius:9,marginTop:10},
  addressRow:{flexDirection:'row',gap:7,marginTop:12},
  addressOption:{flex:1,alignItems:'center',borderWidth:1,borderRadius:9,paddingVertical:12,paddingHorizontal:3},
- themeRow:{flexDirection:'row',gap:12,marginTop:14},
- themeOption:{flex:1,padding:9,borderRadius:13,borderWidth:1,borderColor:c.border,backgroundColor:c.surface},
+ themeRow:{flexDirection:'row',flexWrap:'wrap',gap:12,marginTop:14},
+ themeOption:{flexGrow:1,flexBasis:'40%',padding:9,borderRadius:13,borderWidth:1,borderColor:c.border,backgroundColor:c.surface},
  themeOptionSelected:{borderColor:c.accent,borderWidth:2,padding:8},
  themePreview:{height:114,borderRadius:9,borderWidth:1,padding:12,justifyContent:'space-between'},
  previewHeader:{width:36,height:8,borderRadius:5},

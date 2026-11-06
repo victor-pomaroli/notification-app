@@ -21,6 +21,14 @@ A cada versão:
 
 _Nada ainda._
 
+## [1.3.0] — 2026-11-05
+
+### Adicionado
+- Dois temas novos, escolhidos em Ajustes e no onboarding, abaixo dos dois originais:
+  - **Rosa chiclete** (claro): fundo rosado, realce framboesa e post-it rosa com tachinha verde-água.
+  - **Azul noturno** (escuro): fundo azul-marinho, realce ciano, eventos em lilás e folha de bloco azul com fita rosa.
+- Os temas valem para todo o app, inclusive diálogos e o widget.
+
 ## [1.2.1] — 2026-11-05
 
 ### Corrigido
@@ -77,7 +85,8 @@ Primeira versão numerada depois do MVP. Reúne os PRs #1 a #4 e #10 a #15.
 ### Adicionado
 - MVP: lista de tarefas com SQLite local, tema escuro e notificação no vencimento.
 
-[Não lançado]: https://github.com/victor-pomaroli/ping-app/compare/v1.2.1...HEAD
+[Não lançado]: https://github.com/victor-pomaroli/ping-app/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.3.0
 [1.2.1]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.2.1
 [1.2.0]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.2.0
 [1.1.0]: https://github.com/victor-pomaroli/ping-app/releases/tag/v1.1.0

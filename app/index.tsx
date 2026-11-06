@@ -4,7 +4,7 @@ import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {localDay,Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,deleteTask} from '../src/store';
 import {categories,TaskCategory} from '../src/templates';
-import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
+import {useAppTheme,ThemeColors,categoryColors,priorityColors,isDarkAppearance} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 import {CalendarScreen} from '../src/components/CalendarScreen';
 import {SummaryNote} from '../src/components/SummaryNote';
@@ -264,7 +264,7 @@ export default function Home(){
   return <View style={s.root}>
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
-    <StatusBar barStyle={c.background==='#111310'?"light-content":"dark-content"}/>
+    <StatusBar barStyle={isDarkAppearance(appearance)?"light-content":"dark-content"}/>
     <Animated.ScrollView ref={pager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} scrollEnabled={!filtersTouched}
       style={{flex:1}} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
       onScroll={Animated.event([{nativeEvent:{contentOffset:{x:horizontalX}}}],{useNativeDriver:true,listener:(event:any)=>{const width=pageWidthRef.current;if(width>0)pageRef.current=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/width)));}})}

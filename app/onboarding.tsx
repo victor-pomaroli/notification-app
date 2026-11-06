@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,Pressable,ScrollView,StyleSheet,ActivityIndicator} from 'react-native';
 import {useRouter} from 'expo-router';
-import {useAppTheme,ThemeColors,Appearance,palettes} from '../src/theme';
+import {useAppTheme,ThemeColors,Appearance,palettes,appearances,appearanceNames} from '../src/theme';
 import {AddressStyle,NotificationPersonality,completeOnboarding,getPreferences} from '../src/preferences';
 import {rescheduleAllReminders} from '../src/store';
 import {ensureNotificationPermission} from '../src/notifications';
@@ -56,7 +56,7 @@ export default function Onboarding(){
       <Text style={s.note}>{description}</Text>
       <Text style={[s.note,{backgroundColor:c.background,padding:10,borderRadius:7}]}>{preview}</Text>
     </Pressable>)}</View>:null}
-    {step===3?<View style={s.themeRow}>{(['dark','softLight'] as Appearance[]).map(key=>{const palette=palettes[key],selected=appearance===key;return <Pressable key={key} accessibilityRole="radio" accessibilityState={{checked:selected}} disabled={themeBusy} onPress={()=>selectTheme(key)} style={[s.themeOption,selected&&{borderColor:c.accent,borderWidth:2}]}>
+    {step===3?<View style={s.themeRow}>{appearances.map(key=>{const palette=palettes[key],selected=appearance===key;return <Pressable key={key} accessibilityRole="radio" accessibilityState={{checked:selected}} disabled={themeBusy} onPress={()=>selectTheme(key)} style={[s.themeOption,selected&&{borderColor:c.accent,borderWidth:2}]}>
       <View style={[s.themePreview,{backgroundColor:palette.background,borderColor:palette.border}]}>
         <View style={{height:9,width:44,backgroundColor:palette.accent,borderRadius:5}}/>
         <View style={{backgroundColor:palette.surface,borderWidth:1,borderColor:palette.border,borderRadius:7,padding:12,gap:8}}>
@@ -65,7 +65,7 @@ export default function Onboarding(){
         </View>
         <View style={{height:20,backgroundColor:palette.surface,borderRadius:6,flexDirection:'row',justifyContent:'space-evenly',alignItems:'center'}}>{[0,1,2].map(i=><View key={i} style={{width:18,height:5,borderRadius:3,backgroundColor:i===0?palette.accent:palette.muted}}/>)}</View>
       </View>
-      <Text style={s.themeName}>{key==='dark'?'Escuro original':'Claro suave'}</Text>
+      <Text style={s.themeName}>{appearanceNames[key]}</Text>
       <Text style={[s.themeStatus,{color:selected?c.accent:c.muted}]}>{selected?'✓ SELECIONADO':'TOQUE PARA USAR'}</Text>
     </Pressable>;})}</View>:null}
     {error?<Text style={{color:c.danger,marginTop:16}}>{error}</Text>:null}
@@ -96,9 +96,9 @@ const styles=(c:ThemeColors)=>StyleSheet.create({
   actions:{flexDirection:'row',gap:10,marginTop:32},
   back:{padding:18,borderRadius:9,backgroundColor:c.surface,borderWidth:1,borderColor:c.border},
   next:{flex:1,padding:18,borderRadius:9,backgroundColor:c.accent,alignItems:'center'},
-  themeRow:{flexDirection:'row',gap:12},
-  themeOption:{flex:1,backgroundColor:c.surface,borderWidth:1,borderColor:c.border,borderRadius:12,padding:10},
-  themePreview:{height:155,borderWidth:1,borderRadius:9,padding:12,justifyContent:'space-between'},
+  themeRow:{flexDirection:'row',flexWrap:'wrap',gap:12},
+  themeOption:{flexGrow:1,flexBasis:'40%',backgroundColor:c.surface,borderWidth:1,borderColor:c.border,borderRadius:12,padding:10},
+  themePreview:{height:118,borderWidth:1,borderRadius:9,padding:12,justifyContent:'space-between'},
   themeName:{color:c.text,fontWeight:'800',fontSize:13,marginTop:12},
   themeStatus:{fontSize:10,fontWeight:'800',marginTop:6},
   footer:{color:c.muted,textAlign:'center',fontSize:12,marginTop:20}
