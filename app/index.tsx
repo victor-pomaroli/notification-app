@@ -4,7 +4,7 @@ import {useFocusEffect,useRouter} from 'expo-router';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {localDay,Task,listTasks,listTaskPage,archiveOldCompletedTasks,completeTask,deleteTask} from '../src/store';
 import {categories,TaskCategory} from '../src/templates';
-import {useAppTheme,ThemeColors,categoryColors,priorityColors} from '../src/theme';
+import {useAppTheme,ThemeColors,categoryColors,priorityColors,isDarkAppearance} from '../src/theme';
 import {PingDialog} from '../src/components/PingDialog';
 import {CalendarScreen} from '../src/components/CalendarScreen';
 import {SummaryNote} from '../src/components/SummaryNote';
@@ -203,21 +203,29 @@ export default function Home(){
     {groupedCards(section.tasks,filteredPage,{dayKnown:/^d\d/.test(section.key),page:'tasks'})}
   </React.Fragment>;
   const homeHasPending=overdue.length+agenda.length+upcoming.length>0;
-  // Comemoração (confete + post-it balançando): uma vez por "tudo cumprido". A assinatura é o dia
-  // + as concluídas de hoje; só comemora de novo se ela mudar (ex.: criou e concluiu outra tarefa).
-  // Fica salva no banco, então trocar de aba ou reabrir o app não repete. Se tudo for concluído
-  // fora da aba Hoje (widget, notificação, Tarefas), comemora na próxima vez que ela abrir.
-  const allDone=!homeHasPending&&completedToday.length>0;
-  const celebration=allDone?`${localDay(new Date(now))}:${completedToday.map(t=>t.id).sort((a,b)=>a-b).join(',')}`:'';
+  // Comemoração (confete + post-it balançando): toda vez que o dia é zerado. Ao ver alguma tarefa
+  // pendente em Hoje, a comemoração é "rearmada"; ao zerar de novo (concluiu uma nova, ou reabriu e
+  // concluiu a mesma), solta outra vez. Fica salva no banco com o dia, então trocar de aba ou reabrir
+  // o app sem nada novo não repete. Se zerar fora da aba Hoje (widget, notificação, Tarefas),
+  // comemora na próxima vez que ela abrir. Eventos não contam: não têm o que concluir.
+  const tasksPending=overdue.length+upcoming.length>0;
+  const allDone=!tasksPending&&completedToday.length>0;
+  const dayStamp=localDay(new Date(now));
   const celebrated=useRef<string|null>(null);
   const [celebratedLoaded,setCelebratedLoaded]=useState(false);
   React.useEffect(()=>{getMeta('celebratedAllDone').then(v=>{celebrated.current=v;}).catch(()=>{}).finally(()=>setCelebratedLoaded(true));},[]);
   React.useEffect(()=>{
-    if(tab!=='home'||!celebration||!celebratedLoaded||celebrated.current===celebration)return;
-    celebrated.current=celebration;
-    setMeta('celebratedAllDone',celebration).catch(console.warn);
+    if(!celebratedLoaded)return;
+    if(tasksPending){
+      // Voltou a ter o que fazer: a próxima vez que zerar merece confete.
+      if(celebrated.current){celebrated.current='';setMeta('celebratedAllDone','').catch(console.warn);}
+      return;
+    }
+    if(tab!=='home'||!allDone||celebrated.current===dayStamp)return;
+    celebrated.current=dayStamp;
+    setMeta('celebratedAllDone',dayStamp).catch(console.warn);
     setConfettiKey(k=>k+1);
-  },[tab,celebration,celebratedLoaded]);
+  },[tab,tasksPending,allDone,dayStamp,celebratedLoaded]);
   React.useEffect(()=>{
     if(!highlightRequest)return;
     const found=tasks.find(t=>t.id===highlightRequest.id);
@@ -256,7 +264,7 @@ export default function Home(){
   return <View style={s.root}>
     <PingDialog visible={!!deleteTarget} eyebrow="PING / EXCLUSÃO" title="Vai apagar mesmo?" message={deleteTarget?`“${deleteTarget.title}” será excluída de vez. Essa ação não pode ser desfeita.`:undefined} confirmLabel="EXCLUIR" cancelLabel="MANTER" destructive busy={busyDelete} onClose={()=>{if(!busyDelete)setDeleteTarget(null);}} onConfirm={confirmDelete}/>
     <PingDialog visible={!!feedback} eyebrow="PING / OPS" title={feedback?.title??''} message={feedback?.message} confirmLabel="FECHAR" onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>
-    <StatusBar barStyle={c.background==='#111310'?"light-content":"dark-content"}/>
+    <StatusBar barStyle={isDarkAppearance(appearance)?"light-content":"dark-content"}/>
     <Animated.ScrollView ref={pager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} scrollEnabled={!filtersTouched}
       style={{flex:1}} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
       onScroll={Animated.event([{nativeEvent:{contentOffset:{x:horizontalX}}}],{useNativeDriver:true,listener:(event:any)=>{const width=pageWidthRef.current;if(width>0)pageRef.current=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/width)));}})}

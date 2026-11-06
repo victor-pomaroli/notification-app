@@ -55,7 +55,7 @@ Um widget de tela inicial com as próximas tarefas e as concluídas do dia, no m
 ### Personalização e dados
 
 - **Primeiro uso:** um onboarding de 4 passos (nome, forma de tratamento, personalidade e tema).
-- **Temas:** escuro (verde-limão sobre carvão) e claro suave.
+- **Temas:** escuro original (verde-limão sobre carvão), claro suave, rosa chiclete (claro) e azul noturno (escuro). Cada um muda o app inteiro, os diálogos, o widget e o papel da nota de resumo.
 - **Ajustes:** nome, tratamento, personalidade, tema, lembretes ativos ou pausados, privacidade, teste de notificação, diagnóstico dos lembretes programados, permissões do Android e "apagar todas as tarefas".
 - **Histórico:** concluídas há mais de 30 dias são arquivadas automaticamente e podem ser restauradas.
 

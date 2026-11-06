@@ -7,7 +7,7 @@ import {needsOnboarding} from '../src/preferences';
 import {initDB,reconcileReminders} from '../src/store';
 import {setupNotifications,ensureNotificationPermission} from '../src/notifications';
 import {handleNotificationResponse} from '../src/notification-actions';
-import {ThemeProvider,useAppTheme} from '../src/theme';
+import {ThemeProvider,useAppTheme,isDarkAppearance} from '../src/theme';
 import {DialogHost} from '../src/components/PingDialog';
 import {requestHighlight} from '../src/highlight';
 function AppStack(){
@@ -37,7 +37,7 @@ function AppStack(){
   useEffect(()=>{let active=true;initDB().then(needsOnboarding).then(needed=>{if(active){setNeedsSetup(needed);setReady(true);}}).catch(e=>{console.warn(e);if(active)setReady(true);});return()=>{active=false;};},[]);
   useEffect(()=>{if(!ready||segments[0]==='onboarding'||!needsSetup)return;let active=true;needsOnboarding().then(needed=>{if(!active)return;setNeedsSetup(needed);if(needed)router.replace('/onboarding');}).catch(console.warn);return()=>{active=false;};},[ready,needsSetup,segments,router]);
   if(!ready)return <View style={{flex:1,backgroundColor:theme.background,justifyContent:'center',alignItems:'center'}}><ActivityIndicator color={theme.accent}/></View>;
-  return <><StatusBar style={appearance==='dark'?"light":"dark"}/><Stack screenOptions={{
+  return <><StatusBar style={isDarkAppearance(appearance)?"light":"dark"}/><Stack screenOptions={{
     headerStyle:{backgroundColor:theme.background},headerTintColor:theme.text,
     headerShadowVisible:false,contentStyle:{backgroundColor:theme.background},
   }}><Stack.Screen name="index" options={{headerShown:false}}/><Stack.Screen name="onboarding" options={{headerShown:false,gestureEnabled:false}}/><Stack.Screen name="settings" options={{title:"Ajustes"}}/><Stack.Screen name="routines" options={{title:"Minhas rotinas"}}/><Stack.Screen name="archive" options={{title:"Histórico"}}/><Stack.Screen name="edit" options={{title:'Detalhes da tarefa'}}/></Stack><DialogHost/></>;

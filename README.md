@@ -5,7 +5,7 @@
 - **O que é o Ping, para quem é e como funciona:** [PRODUCT.md](PRODUCT.md)
 - **Versões e o que mudou em cada uma:** [CHANGELOG.md](CHANGELOG.md)
 
-Versão atual: **1.2.0**
+Versão atual: **1.3.0**
 
 ## Destaques
 
@@ -14,7 +14,7 @@ Versão atual: **1.2.0**
 - **Calendário** mensal.
 - Notificações em três personalidades, com botões **Concluir** e **Adiar**.
 - **Widget** Android que conclui tarefas sem abrir o app.
-- Temas escuro e claro. Sem conta e sem nuvem.
+- Quatro temas: escuro, claro, rosa e azul. Sem conta e sem nuvem.
 
 ## Stack
 
